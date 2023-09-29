@@ -114,7 +114,10 @@ export class BasicTimer {
 	}
 }
 
-function validateThinkingTimeBlocks(blocks: ThinkingTimeBlock[], numEnds: number) {
+function validateThinkingTimeBlocks(blocks: ThinkingTimeBlock[] | "track-only", numEnds: number) {
+	if (blocks === "track-only") {
+		return;
+	}
 	if (blocks.length === 0) {
 		throw new Error("Thinking time blocks cannot be empty");
 	}
@@ -160,6 +163,7 @@ export class CurlingTimer {
 	private teamThinking: 1 | 2 | null;
 
 	constructor(settings: CurlingTimerSettings) {
+		validateThinkingTimeBlocks(settings.thinkingTimeBlocks, settings.endCount);
 		this.team1Timer = new SuperCountdown(0);
 		this.team2Timer = new SuperCountdown(0);
 		this.globalTimer = new SuperCountdown(0);
