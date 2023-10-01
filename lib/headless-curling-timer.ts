@@ -103,14 +103,26 @@ const wcfMixedDoublesStandardSettings: CurlingTimerSettings = {
 };
 
 export class BasicTimer {
-	private timer: SuperCountdown;
+	private _timer: SuperCountdown;
 
 	constructor(settings: BasicTimerSettings, onCompletion: () => void) {
-		this.timer = new SuperCountdown(settings.totalTime * milliseconds, onCompletion);
+		this._timer = new SuperCountdown(settings.totalTime * milliseconds, onCompletion);
+	}
+
+	public get timer() {
+		return this._timer;
+	}
+
+	public start() {
+		this._timer.start();
+	}
+
+	public pause() {
+		this._timer.pause();
 	}
 
 	public addTime(sec: number) {
-		this.timer.addTime(sec * milliseconds);
+		this._timer.addTime(sec * milliseconds);
 	}
 }
 
