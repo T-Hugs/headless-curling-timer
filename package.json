@@ -1,6 +1,6 @@
 {
 	"name": "@trevorsg/headless-curling-timer",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "A headless timing library for curling games.",
 	"directories": {
 		"doc": "docs"
@@ -34,7 +34,7 @@
 	"types": "dist/out-tsc/lib/headless-curling-timer.d.ts",
 	"scripts": {
 		"test": "jest",
-		"docgen": "typedoc --out ./docs/api ./lib/curling-timer.ts",
+		"docgen": "typedoc --out ./docs/api ./lib/headless-curling-timer.ts",
 		"build": "tsc -p .",
 		"build-demo": "vite build",
 		"dev": "npm run build && vite serve"
