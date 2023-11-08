@@ -153,13 +153,14 @@ export type CurlingTimerGameState =
 	| "pre-game"
 	| "thinking"
 	| "idle"
+	| "home-travel"
+	| "away-travel"
 	| "timeout"
 	| "between-ends"
 	| "midgame-break"
 	| null;
 
 const milliseconds = 1000;
-
 
 export class CurlingTimer {
 	private readonly team1Timer: SuperCountdown;
@@ -201,10 +202,32 @@ export class CurlingTimer {
 		return null;
 	}
 
-	private getTimers(team: 1 | 2) {
-		const timer = team === 1 ? this.team1Timer : this.team2Timer;
-		const otherTimer = team === 1 ? this.team2Timer : this.team1Timer;
+	private getThinkingTimers(team?: 1 | 2) {
+		const currentTeam = team ?? this.teamThinking;
+		if (!currentTeam) {
+			throw new Error("No team is thinking");
+		}
+		const timer = currentTeam === 1 ? this.team1Timer : this.team2Timer;
+		const otherTimer = currentTeam === 1 ? this.team2Timer : this.team1Timer;
 		return { timer, otherTimer };
+	}
+
+	private getCurrentTimer() {
+		if (this.mode !== "game") {
+			if (this.mode === "idle") {
+				return undefined;
+			} else {
+				return this.globalTimer;
+			}
+		} else {
+			if (this.gameState === "thinking") {
+				return this.getThinkingTimers().timer;
+			}
+			if (this.gameState !== "idle") {
+				return this.globalTimer;
+			}
+		}
+		return undefined;
 	}
 
 	public get timers() {
@@ -247,11 +270,32 @@ export class CurlingTimer {
 		this.globalTimer.start();
 	}
 
+	/**
+	 * Pause whatever timer is currently running. Does NOT change the game state.
+	 * Invariant: calling unpause() after pause() (assuming no intervening calls)
+	 * will resume the same timer.
+	 */
+	public pause() {
+		this.team1Timer.pause();
+		this.team2Timer.pause();
+		this.globalTimer.pause();
+	}
+
+	/**
+	 * Unpauses whatever timer is relevant to the current game state.
+	 */
+	public unpause() {
+		const timer = this.getCurrentTimer();
+		if (timer) {
+			timer.unpause();
+		}
+	}
+
 	public startThinking(team: 1 | 2) {
 		if (this.mode === "game") {
 			this.gameState = "thinking";
 			this.teamThinking = team;
-			const { timer, otherTimer } = this.getTimers(team);
+			const { timer, otherTimer } = this.getThinkingTimers(team);
 			otherTimer.pause();
 			this.globalTimer.pause();
 			timer.start();
@@ -331,27 +375,48 @@ export class CurlingTimer {
 		}
 	}
 
-	public startTimeout(team: 1 | 2) {
+	public startTimeout(team: 1 | 2, side?: "home" | "away") {
+		const autoSide = this.end % 2 === 0 ? "home" : "away";
+		const defaultedSide = side ?? autoSide;
+		const travelTime = defaultedSide === "home" ? this.settings.homeTravelTime : this.settings.awayTravelTime;
 		if (this.mode === "game") {
-			this.gameState = "timeout";
+			this.gameState = `${defaultedSide}-travel`;
 			this.team1Timer.pause();
 			this.team2Timer.pause();
-			this.globalTimer.setTimeRemaining(this.settings.timeoutTime * milliseconds);
+			this.globalTimer.setTimeRemaining(travelTime * milliseconds);
 			this.teamTimedOut = team;
 			this.globalTimer.registerCompleteCallback(() => {
-				this.gameState = "idle";
-				this.teamTimedOut = null;
-				if (team === 1) {
-					this.team1Timeouts--;
-				} else {
-					this.team2Timeouts--;
-				}
+				this.gameState = "timeout";
+				this.globalTimer.setTimeRemaining(this.settings.timeoutTime * milliseconds);
+				this.globalTimer.registerCompleteCallback(() => {
+					this.gameState = "idle";
+					this.teamTimedOut = null;
+					if (team === 1) {
+						this.team1Timeouts--;
+					} else {
+						this.team2Timeouts--;
+					}
+				}, true);
 			}, true);
 			this.globalTimer.start();
 		}
 	}
 
+	/**
+	 * Ends the travel time, which immediately begins the timeout time.
+	 */
+	public endTravelTime() {
+		if (this.gameState === "home-travel" || this.gameState === "away-travel") {
+			this.globalTimer.setTimeRemaining(0);
+		}
+	}
+
+	/**
+	 * Ends the current timeout. If travel time is in progress, end that too.
+	 * @param replenishTimeout
+	 */
 	public endTimeout(replenishTimeout = false) {
+		this.endTravelTime();
 		if (this.mode === "game" && this.gameState === "timeout" && this.teamTimedOut) {
 			this.globalTimer.setTimeRemaining(0);
 			if (replenishTimeout) {
@@ -366,14 +431,14 @@ export class CurlingTimer {
 
 	public addTime(team: 1 | 2, sec: number) {
 		if (this.mode === "game") {
-			const { timer } = this.getTimers(team);
+			const { timer } = this.getThinkingTimers(team);
 			timer.addTime(sec * milliseconds);
 		}
 	}
 
 	public setTime(team: 1 | 2, secRemaining: number) {
 		if (this.mode === "game") {
-			const { timer } = this.getTimers(team);
+			const { timer } = this.getThinkingTimers(team);
 			timer.setTimeRemaining(secRemaining * milliseconds);
 		}
 	}
