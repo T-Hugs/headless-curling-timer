@@ -10,7 +10,6 @@
 		"target": "esnext",
 
 		"moduleResolution": "node",
-		"noEmit": true,
 		"moduleDetection": "force",
 
 		"jsx": "react-jsx", // support JSX
