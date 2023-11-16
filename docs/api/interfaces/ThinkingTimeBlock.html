@@ -15,12 +15,27 @@
 <li><a href="../modules.html">@trevorsg/headless-curling-timer</a></li>
 <li><a href="ThinkingTimeBlock.html">ThinkingTimeBlock</a></li></ul>
 <h1>Interface ThinkingTimeBlock</h1></div>
+<section class="tsd-panel tsd-comment">
+<div class="tsd-comment tsd-typography"><p>A thinking time block represents an amount of thinking time
+that will apply to a range of ends. For example, in the common
+case, 38 minutes of thinking time is given for the range of
+end 1 through end 10. However, some tournaments may have
+&quot;per-end&quot; thinking time, where a &quot;block&quot; may represent only a
+single end.</p>
+<p>In the first case, CurlingTimerSettings would specify an array
+containing only one ThinkingTimeBlock, with startEnd=1,
+endEnd=10, and thinkingTime=38*60.</p>
+<p>In the second case, CurlingTimerSettings would specify an array
+containing 10 ThinkingTimeBlocks, each with startEnd=endEnd=i,
+and thinkingTime=n, where n may be 240 (4 minutes) for the first
+5 ends and 255 (4 minutes 15 seconds) for the last 5 ends.</p>
+</div></section>
 <section class="tsd-panel tsd-hierarchy">
 <h4>Hierarchy</h4>
 <ul class="tsd-hierarchy">
 <li><span class="target">ThinkingTimeBlock</span></li></ul></section><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/T-Hugs/headless-curling-timer/blob/4760601/lib/headless-curling-timer.ts#L3">headless-curling-timer.ts:3</a></li></ul></aside>
+<li>Defined in <a href="https://github.com/T-Hugs/headless-curling-timer/blob/c573656/lib/headless-curling-timer.ts#L20">headless-curling-timer.ts:20</a></li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-index-accordion" open><summary class="tsd-accordion-summary tsd-index-summary">
@@ -36,19 +51,25 @@
 <h2>Properties</h2>
 <section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface"><a id="endEnd" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>end<wbr/>End</span><a href="#endEnd" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" id="icon-anchor-a"></path><path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" id="icon-anchor-b"></path><path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" id="icon-anchor-c"></path></svg></a></h3>
-<div class="tsd-signature">end<wbr/>End<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div><aside class="tsd-sources">
+<div class="tsd-signature">end<wbr/>End<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
+<div class="tsd-comment tsd-typography"><p>The last end this block applies to.</p>
+</div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/T-Hugs/headless-curling-timer/blob/4760601/lib/headless-curling-timer.ts#L5">headless-curling-timer.ts:5</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/T-Hugs/headless-curling-timer/blob/c573656/lib/headless-curling-timer.ts#L29">headless-curling-timer.ts:29</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface"><a id="startEnd" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>start<wbr/>End</span><a href="#startEnd" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
-<div class="tsd-signature">start<wbr/>End<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div><aside class="tsd-sources">
+<div class="tsd-signature">start<wbr/>End<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
+<div class="tsd-comment tsd-typography"><p>The first end this block applies to.</p>
+</div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/T-Hugs/headless-curling-timer/blob/4760601/lib/headless-curling-timer.ts#L4">headless-curling-timer.ts:4</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/T-Hugs/headless-curling-timer/blob/c573656/lib/headless-curling-timer.ts#L24">headless-curling-timer.ts:24</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface"><a id="thinkingTime" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>thinking<wbr/>Time</span><a href="#thinkingTime" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
-<div class="tsd-signature">thinking<wbr/>Time<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div><aside class="tsd-sources">
+<div class="tsd-signature">thinking<wbr/>Time<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
+<div class="tsd-comment tsd-typography"><p>The full amount of thinking time given for this block.</p>
+</div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/T-Hugs/headless-curling-timer/blob/4760601/lib/headless-curling-timer.ts#L6">headless-curling-timer.ts:6</a></li></ul></aside></section></section></div>
+<li>Defined in <a href="https://github.com/T-Hugs/headless-curling-timer/blob/c573656/lib/headless-curling-timer.ts#L34">headless-curling-timer.ts:34</a></li></ul></aside></section></section></div>
 <div class="col-4 col-menu menu-sticky-wrap menu-highlight">
 <div class="tsd-navigation settings">
 <details class="tsd-index-accordion"><summary class="tsd-accordion-summary">

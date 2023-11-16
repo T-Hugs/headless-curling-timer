@@ -1,23 +1,26 @@
 {
-	"include": ["lib/**/*.ts"],
+	"include": ["lib/**/*.ts", "tests/**/*.ts"],
 	"compilerOptions": {
-		"rootDir": ".",
-		"sourceMap": true,
+		// add Bun type definitions
+		"types": ["bun-types"],
+
+		// enable latest features
+		"lib": ["ESNext"],
+		"module": "esnext",
+		"target": "esnext",
+
 		"moduleResolution": "node",
-		"emitDecoratorMetadata": true,
-		"experimentalDecorators": true,
-		"importHelpers": true,
-		"target": "ES2020",
-		"module": "ES2020",
-		"skipLibCheck": true,
-		"skipDefaultLibCheck": true,
-		"baseUrl": ".",
-		"forceConsistentCasingInFileNames": true,
+		"noEmit": true,
+		"moduleDetection": "force",
+
+		"jsx": "react-jsx", // support JSX
+		"allowJs": true, // allow importing `.js` from `.ts`
+
+		// best practices
 		"strict": true,
-		"noImplicitReturns": true,
-		"noFallthroughCasesInSwitch": true,
-		"outDir": "dist/out-tsc",
-		"declaration": true,
-		"lib": ["ES2020", "DOM"]
+		"forceConsistentCasingInFileNames": true,
+		"skipLibCheck": true,
+		"composite": true,
+		"allowSyntheticDefaultImports": true
 	}
 }

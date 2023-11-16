@@ -1,16 +1,17 @@
 {
   "name": "@trevorsg/headless-curling-timer",
-  "version": "1.2.0",
+  "version": "1.4.0",
   "description": "A headless timing library for curling games.",
   "directories": {
     "doc": "docs"
   },
   "devDependencies": {
-    "@trevorsg/super-timer": "1.4.0",
+    "@trevorsg/super-timer": "1.5.4",
     "@types/react": "^18.0.28",
     "@types/react-dom": "^18.0.10",
     "@vitejs/plugin-react": "^3.1.0",
     "autoprefixer": "^10.4.13",
+    "bun-types": "^1.0.11",
     "mocha": "^10.2.0",
     "prettier": "^3.0.0",
     "react": "^18.2.0",
