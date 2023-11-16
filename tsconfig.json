@@ -1,6 +1,8 @@
 {
 	"include": ["lib/**/*.ts", "tests/**/*.ts"],
 	"compilerOptions": {
+		"outDir": "dist/out-tsc",
+
 		// add Bun type definitions
 		"types": ["bun-types"],
 
@@ -11,6 +13,7 @@
 
 		"moduleResolution": "node",
 		"moduleDetection": "force",
+		"declaration": true,
 
 		"jsx": "react-jsx", // support JSX
 		"allowJs": true, // allow importing `.js` from `.ts`
