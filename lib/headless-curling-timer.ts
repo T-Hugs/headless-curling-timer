@@ -148,7 +148,7 @@ export interface CurlingTimerSettings {
 	 *
 	 * @default 1.0
 	 */
-	timerSpeedMultiplier: number;
+	timerSpeedMultiplier?: number;
 }
 
 export interface CurlingTimerState {
@@ -296,7 +296,7 @@ export interface BasicTimerSettings {
 	 *
 	 * @default 1.0
 	 */
-	timerSpeedMultiplier: number;
+	timerSpeedMultiplier?: number;
 }
 
 const basic10EndSettings: BasicTimerSettings = {
