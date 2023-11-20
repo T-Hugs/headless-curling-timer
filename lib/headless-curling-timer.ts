@@ -754,7 +754,7 @@ export class CurlingTimer {
 			const currentStone = nextStoneNumber === 1 ? null : nextStoneNumber - 1;
 			this.currentTeam1Stone = currentStone;
 			this.currentTeam2Stone = currentStone;
-			
+
 			// If non-hammer team has already thrown, advance their stone count
 			if (this.lastThinkingTeam !== this.hammerTeam) {
 				if (this.lastThinkingTeam === 1) {
@@ -788,7 +788,7 @@ export class CurlingTimer {
 	/**
 	 * Sets the current end. Calling this function changes nothing else about the
 	 * state of the game, including thinking time.
-	 * @param end 
+	 * @param end
 	 */
 	public setCurrentEnd(end: number) {
 		if (end < 1 || end > this.settings.endCount) {
@@ -803,11 +803,9 @@ export class CurlingTimer {
 	 */
 	public betweenEnds() {
 		if (this.mode === "game") {
+			this.stopThinking();
 			this.gameState = "between-ends";
 			this.hammerTeam = null;
-			this.team1Timer.pause();
-			this.team2Timer.pause();
-			this.teamThinking = null;
 			this.globalTimer.setTimeRemaining(this.settings.betweenEndTime * milliseconds);
 			this.globalTimer.registerCompleteCallback(() => {
 				this.gameState = "prep";
@@ -975,11 +973,12 @@ export class CurlingTimer {
 	 * @param replenishTimeout
 	 */
 	public endTimeout(replenishTimeout = false) {
+		const teamTimedOut = this.teamTimedOut;
 		this.endTravelTime();
-		if (this.teamTimedOut) {
+		if (teamTimedOut) {
 			this.globalTimer.setTimeRemaining(0);
 			if (replenishTimeout) {
-				if (this.teamTimedOut === 1) {
+				if (teamTimedOut === 1) {
 					this.team1Timeouts++;
 				} else {
 					this.team2Timeouts++;
@@ -1062,7 +1061,7 @@ export class CurlingTimer {
 	/**
 	 * Alias for getFullState(), but may diverge in the future. This method
 	 * is always guaranteed to return a JSON-serializable object.
-	 * @returns 
+	 * @returns
 	 */
 	public serialize(): CurlingTimerState {
 		return this.getFullState();
@@ -1070,8 +1069,8 @@ export class CurlingTimer {
 
 	/**
 	 * Synthesize a CurlingTimer from a state object (e.g. from getFullState()).
-	 * @param state 
-	 * @returns 
+	 * @param state
+	 * @returns
 	 */
 	public static unserialize(state: CurlingTimerState): CurlingTimer {
 		const timer = new CurlingTimer(state.settings);

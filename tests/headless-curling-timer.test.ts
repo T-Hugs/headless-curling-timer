@@ -1,4 +1,4 @@
-import { expect, jest, test } from "bun:test";
+import { expect, jest, spyOn, test } from "bun:test";
 import {
 	getBasicConfig,
 	getStandardConfig,
@@ -428,9 +428,11 @@ test("between ends", async () => {
 	config.timerSpeedMultiplier = 1000;
 	const timer = new CurlingTimer(config);
 	timer.startGame();
+	const stopThinkingSpy = spyOn(timer, "stopThinking");
 	expect(timer.getFullState().end).toBe(1);
 	timer.betweenEnds();
 	await Bun.sleep(10);
+	expect(stopThinkingSpy).toHaveBeenCalled();
 	expect(timer.getFullState().gameState).toBe("between-ends");
 	await Bun.sleep(40);
 	expect(timer.getFullState().gameState).toBe("prep");
@@ -561,6 +563,15 @@ test("Timeouts basic", async () => {
 	timer.endTimeout(true);
 	expect(timer.getFullState().team2Timeouts).toBe(1);
 	expect(timer.getFullState().teamTimedOut).toBe(null);
+
+	timer.setTimeoutCount(1, 1);
+	timer.setTimeoutCount(2, 1);
+	timer.startTimeout(1);
+	Bun.sleep(10);
+	timer.endTimeout(true);
+	expect(timer.getFullState().team1Timeouts).toBe(1);
+	expect(timer.getFullState().teamTimedOut).toBe(null);
+
 });
 
 test("Add/set time", () => {
