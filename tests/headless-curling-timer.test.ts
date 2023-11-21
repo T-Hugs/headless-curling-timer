@@ -1,4 +1,4 @@
-import { expect, jest, spyOn, test } from "bun:test";
+import { expect, jest, mock, spyOn, test } from "bun:test";
 import {
 	getBasicConfig,
 	getStandardConfig,
@@ -490,7 +490,7 @@ test("midgame break", async () => {
 	timer.midgameBreak();
 	await Bun.sleep(10);
 	expect(timer.getFullState().gameState).toBe("midgame-break");
-	await Bun.sleep(40);
+	await Bun.sleep(42);
 	expect(timer.getFullState().gameState).toBe("prep");
 	await Bun.sleep(10);
 	expect(timer.getFullState().gameState).toBe("idle");
@@ -524,7 +524,7 @@ test("dispose", () => {
 	timer.startGame();
 	expect(timer.getFullState().mode).toBe("game");
 	timer.dispose();
-	const {team1Timer, team2Timer, globalTimer} = timer.timers;
+	const { team1Timer, team2Timer, globalTimer } = timer.timers;
 	expect(() => team1Timer.addTime(10)).toThrow();
 	expect(() => team2Timer.addTime(10)).toThrow();
 	expect(() => globalTimer.addTime(10)).toThrow();
@@ -571,7 +571,6 @@ test("Timeouts basic", async () => {
 	timer.endTimeout(true);
 	expect(timer.getFullState().team1Timeouts).toBe(1);
 	expect(timer.getFullState().teamTimedOut).toBe(null);
-
 });
 
 test("Add/set time", () => {
@@ -587,4 +586,80 @@ test("Add/set time", () => {
 	timer.setTime(300, "team2");
 	expect(timer.getFullState().team1Time).toBe(200000);
 	expect(timer.getFullState().team2Time).toBe(300000);
+});
+
+test("State change callbacks", async () => {
+	const config = getStandardConfig("10end");
+	config.betweenEndTime = 15;
+	config.prepTime = 10;
+	config.timeoutTime = 15;
+	config.awayTravelTime = 10;
+	config.homeTravelTime = 10;
+	config.timerSpeedMultiplier = 1000;
+	const timer = new CurlingTimer(config);
+	const callback = mock(() => {});
+	timer.addEventListener("statechange", callback);
+	timer.startGame();
+	expect(callback).toHaveBeenCalledTimes(1);
+	timer.startThinking(1);
+	expect(callback).toHaveBeenCalledTimes(2);
+	timer.stopThinking();
+	expect(callback).toHaveBeenCalledTimes(3);
+	timer.startTimeout(1);
+	expect(timer.getFullState().gameState).toBe("away-travel");
+	expect(callback).toHaveBeenCalledTimes(4);
+	timer.endTimeout(); // travel + timeout = 1 state change
+	expect(timer.getFullState().gameState).toBe("idle");
+	expect(callback).toHaveBeenCalledTimes(5);
+	timer.betweenEnds();
+	expect(callback).toHaveBeenCalledTimes(6);
+	timer.endBetweenEnds(); // between ends + prep = 1 state change
+	expect(callback).toHaveBeenCalledTimes(7);
+	timer.midgameBreak();
+	expect(callback).toHaveBeenCalledTimes(8);
+	timer.endMidgameBreak(true);
+	expect(callback).toHaveBeenCalledTimes(9);
+	timer.betweenEnds();
+	expect(callback).toHaveBeenCalledTimes(10);
+	await Bun.sleep(17);
+	expect(callback).toHaveBeenCalledTimes(11);
+	await Bun.sleep(10);
+	expect(callback).toHaveBeenCalledTimes(12);
+	timer.startTimeout(2);
+	expect(callback).toHaveBeenCalledTimes(13);
+	await Bun.sleep(17);
+	expect(callback).toHaveBeenCalledTimes(14);
+	await Bun.sleep(10);
+	expect(callback).toHaveBeenCalledTimes(15);
+	expect(timer.getFullState().gameState).toBe("idle");
+});
+
+test("Countdown complete callbacks", async () => {
+	const config = getStandardConfig("10end");
+	config.betweenEndTime = 15;
+	config.prepTime = 10;
+	config.timeoutTime = 15;
+	config.awayTravelTime = 10;
+	config.homeTravelTime = 10;
+	config.timerSpeedMultiplier = 1000;
+	config.thinkingTimeBlocks = [thinkingTimeTestBlock];
+	const timer = new CurlingTimer(config);
+	const callback = mock(() => {});
+	timer.addEventListener("countdowncomplete", callback);
+	timer.startGame();
+	timer.startThinking(1);
+	await Bun.sleep(30);
+	timer.startTimeout(1);
+	await Bun.sleep(12);
+	expect(callback).toHaveBeenCalledTimes(1);
+	await Bun.sleep(15);
+	expect(callback).toHaveBeenCalledTimes(2);
+	timer.startThinking(1);
+	await Bun.sleep(75);
+	expect(callback).toHaveBeenCalledTimes(3);
+	timer.stopThinking();
+	timer.startThinking(2);
+	await Bun.sleep(105);
+	expect(callback).toHaveBeenCalledTimes(4);
+	timer.stopThinking();
 });

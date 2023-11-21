@@ -514,6 +514,8 @@ export class CurlingTimer {
 	private currentTeam2Stone: number | null = null;
 	private lastThinkingTeam: 1 | 2 | null = null;
 	private hammerTeam: 1 | 2 | null = null;
+	private eventListeners: Map<string, ((state: CurlingTimerState) => void)[]> = new Map();
+	private stateChangesToSuppress: number = 0;
 
 	constructor(settings: CurlingTimerSettings) {
 		if (settings.timerSpeedMultiplier !== 1.0 && !isBunTestEnv()) {
@@ -525,9 +527,15 @@ export class CurlingTimer {
 		}
 
 		validateThinkingTimeBlocks(settings.thinkingTimeBlocks, settings.endCount);
-		this.team1Timer = new SuperCountdown(10, undefined, { timerSpeedMultiplier: settings.timerSpeedMultiplier });
-		this.team2Timer = new SuperCountdown(10, undefined, { timerSpeedMultiplier: settings.timerSpeedMultiplier });
-		this.globalTimer = new SuperCountdown(10, undefined, { timerSpeedMultiplier: settings.timerSpeedMultiplier });
+		this.team1Timer = new SuperCountdown(10, this.countdownComplete.bind(this), {
+			timerSpeedMultiplier: settings.timerSpeedMultiplier,
+		});
+		this.team2Timer = new SuperCountdown(10, this.countdownComplete.bind(this), {
+			timerSpeedMultiplier: settings.timerSpeedMultiplier,
+		});
+		this.globalTimer = new SuperCountdown(10, this.countdownComplete.bind(this), {
+			timerSpeedMultiplier: settings.timerSpeedMultiplier,
+		});
 		this.team1Timeouts = settings.timeoutCount;
 		this.team2Timeouts = settings.timeoutCount;
 		this.settings = settings;
@@ -536,6 +544,19 @@ export class CurlingTimer {
 		this.gameState = null;
 		this.teamTimedOut = null;
 		this.teamThinking = null;
+	}
+
+	private suppressNextStateChange() {
+		this.stateChangesToSuppress++;
+	}
+
+	private countdownComplete() {
+		const countdownCompleteListeners = this.eventListeners.get("countdowncomplete");
+		if (countdownCompleteListeners) {
+			for (const listener of countdownCompleteListeners) {
+				listener(this.getFullState());
+			}
+		}
 	}
 
 	private getCurrentThinkingTimeBlock() {
@@ -587,8 +608,73 @@ export class CurlingTimer {
 		return undefined;
 	}
 
+	private setMode(mode: CurlingTimerMode) {
+		if (this.mode === mode) {
+			return;
+		}
+		
+		this.mode = mode;
+		if (mode === "game") {
+			this.gameState = "idle";
+		} else {
+			this.gameState = null;
+		}
+
+		if (this.stateChangesToSuppress > 0) {
+			this.stateChangesToSuppress--;
+			return;
+		}
+
+		// call any event listeners
+		const stateChangeListeners = this.eventListeners.get("statechange");
+		if (stateChangeListeners) {
+			for (const listener of stateChangeListeners) {
+				listener(this.getFullState());
+			}
+		}
+	}
+
+	private setGameState(gameState: CurlingTimerGameState | null) {
+		if (this.mode !== "game" || gameState === null || this.gameState === gameState) {
+			return;
+		}
+
+		this.gameState = gameState;
+
+		if (this.stateChangesToSuppress > 0) {
+			this.stateChangesToSuppress--;
+			return;
+		}
+
+		// call any event listeners
+		const stateChangeListeners = this.eventListeners.get("statechange");
+		if (stateChangeListeners) {
+			for (const listener of stateChangeListeners) {
+				listener(this.getFullState());
+			}
+		}
+	}
+
 	public get timers() {
 		return { team1Timer: this.team1Timer, team2Timer: this.team2Timer, globalTimer: this.globalTimer };
+	}
+
+	/**
+	 * Add an event listener for the given event name. The callback will be called
+	 * with the current state of the timer after the event occurs.
+	 *
+	 * "statechange" happens when state.mode changes or state.gameState changes.
+	 * "countdowncomplete" happens when any timer completes. Inspect the state to
+	 * find out which timer completed.
+	 *
+	 * @param eventName
+	 * @param callback
+	 */
+	public addEventListener(
+		eventName: "statechange" | "countdowncomplete",
+		callback: (state: CurlingTimerState) => void,
+	) {
+		this.eventListeners.set(eventName, [...(this.eventListeners.get(eventName) ?? []), callback]);
 	}
 
 	/**
@@ -605,8 +691,8 @@ export class CurlingTimer {
 	 * Starts the practice period.
 	 */
 	public startPractice() {
-		this.mode = "practice";
-		this.gameState = null;
+		this.setMode("practice");
+		this.setGameState(null);
 		this.globalTimer.setTimeRemaining(this.settings.practiceTime * milliseconds);
 		this.globalTimer.start();
 	}
@@ -615,8 +701,8 @@ export class CurlingTimer {
 	 * Starts the warm-up period.
 	 */
 	public startWarmup() {
-		this.mode = "warmup";
-		this.gameState = null;
+		this.setMode("warmup");
+		this.setGameState(null);
 		this.globalTimer.setTimeRemaining(this.settings.warmupTime * milliseconds);
 		this.globalTimer.start();
 	}
@@ -625,8 +711,8 @@ export class CurlingTimer {
 	 * Starts the timer for the last stone draw.
 	 */
 	public startLSFE() {
-		this.mode = "lsfe";
-		this.gameState = null;
+		this.setMode("lsfe");
+		this.setGameState(null);
 		this.globalTimer.setTimeRemaining(this.settings.lsfeTime * milliseconds);
 		this.globalTimer.start();
 	}
@@ -636,8 +722,7 @@ export class CurlingTimer {
 	 * values.
 	 */
 	public startGame(hammerTeam?: 1 | 2) {
-		this.mode = "game";
-		this.gameState = "idle";
+		this.setMode("game");
 		this.end = 1;
 		this.currentTeam1Stone = null;
 		this.currentTeam1Stone = null;
@@ -678,7 +763,7 @@ export class CurlingTimer {
 	 */
 	public startThinking(team: 1 | 2) {
 		if (this.mode === "game") {
-			this.gameState = "thinking";
+			this.setGameState("thinking");
 			this.teamThinking = team;
 			const { timer, otherTimer } = this.getThinkingTimers(team);
 			otherTimer.pause();
@@ -729,14 +814,20 @@ export class CurlingTimer {
 	/**
 	 * Stop the currently-running thinking time. This should be called as the
 	 * stone crosses the tee line at the delivery end.
+	 *
+	 * @returns true if a thinking time was stopped, false if it ended up
+	 * being a no-op.
 	 */
-	public stopThinking() {
+	public stopThinking(): boolean {
 		if (this.mode === "game") {
-			this.gameState = "idle";
+			const returnVal = this.gameState === "thinking";
+			this.setGameState("idle");
 			this.teamThinking = null;
 			this.team1Timer.pause();
 			this.team2Timer.pause();
+			return returnVal;
 		}
+		return false;
 	}
 
 	/**
@@ -797,22 +888,23 @@ export class CurlingTimer {
 		this.end = end;
 	}
 
-	/**
-	 * Starts the between-ends break. When it is over, start the prep time countdown, and
-	 * then move to the idle state.
-	 */
-	public betweenEnds() {
+	private _betweenEnds(isMidgameBreak: boolean) {
 		if (this.mode === "game") {
+			if (this.gameState === "thinking") {
+				this.suppressNextStateChange();
+			}
 			this.stopThinking();
-			this.gameState = "between-ends";
+			this.setGameState(isMidgameBreak ? "midgame-break" : "between-ends");
 			this.hammerTeam = null;
-			this.globalTimer.setTimeRemaining(this.settings.betweenEndTime * milliseconds);
+			this.globalTimer.setTimeRemaining(
+				(isMidgameBreak ? this.settings.midgameBreakTime : this.settings.betweenEndTime) * milliseconds,
+			);
 			this.globalTimer.registerCompleteCallback(() => {
-				this.gameState = "prep";
+				this.setGameState("prep");
 				this.globalTimer.setTimeRemaining(this.settings.prepTime * milliseconds);
 				this.globalTimer.registerCompleteCallback(() => {
 					this.advanceEnd();
-					this.gameState = "idle";
+					this.setGameState("idle");
 				}, true);
 				this.globalTimer.start();
 			}, true);
@@ -820,6 +912,32 @@ export class CurlingTimer {
 		}
 	}
 
+	/**
+	 * Starts the between-ends break. When it is over, start the prep time countdown, and
+	 * then move to the idle state.
+	 */
+	public betweenEnds() {
+		this._betweenEnds(false);
+	}
+
+	/**
+	 * Starts the midgame break. When it is over, start the prep time countdown, and
+	 * then move to the idle state.
+	 */
+	public midgameBreak() {
+		this._betweenEnds(true);
+	}
+
+	private _endBetweenEnds(isMidgameBreak: boolean, advanceEnd = true) {
+		const relevantGameState = isMidgameBreak ? "midgame-break" : "between-ends";
+		if (this.mode === "game" && (this.gameState === relevantGameState || this.gameState === "prep")) {
+			this.globalTimer.setTimeRemaining(0, true);
+			if (advanceEnd) {
+				this.advanceEnd();
+			}
+			this.setGameState("idle");
+		}
+	}
 	/**
 	 * Ends the current between-ends break (or prep time if that's in progress). Goes directly
 	 * to the idle state without stopping at prep time.
@@ -830,13 +948,20 @@ export class CurlingTimer {
 	 * @param advanceEnd
 	 */
 	public endBetweenEnds(advanceEnd = true) {
-		if (this.mode === "game" && (this.gameState === "between-ends" || this.gameState === "prep")) {
-			this.globalTimer.setTimeRemaining(0, true);
-			if (advanceEnd) {
-				this.advanceEnd();
-			}
-			this.gameState = "idle";
-		}
+		this._endBetweenEnds(false, advanceEnd);
+	}
+
+	/**
+	 * Ends the midgame break (or prep time if that's in progress). Goes directly
+	 * to the idle state without stopping at prep time.
+	 *
+	 * By default, advance the end count. If this break is canceled (e.g. because an input error),
+	 * caller may pass false to prevent the end count from advancing.
+	 *
+	 * @param advanceEnd
+	 */
+	public endMidgameBreak(advanceEnd = true) {
+		this._endBetweenEnds(true, advanceEnd);
 	}
 
 	/**
@@ -864,49 +989,6 @@ export class CurlingTimer {
 			// The next end uses a different block of thinking time
 			this.team1Timer.setTimeRemaining(nextThinkingTimeBlock.thinkingTime * milliseconds);
 			this.team2Timer.setTimeRemaining(nextThinkingTimeBlock.thinkingTime * milliseconds);
-		}
-	}
-
-	/**
-	 * Starts the midgame break. When it is over, start the prep time countdown, and
-	 * then move to the idle state.
-	 */
-	public midgameBreak() {
-		if (this.mode === "game") {
-			this.gameState = "midgame-break";
-			this.team1Timer.pause();
-			this.team2Timer.pause();
-			this.teamThinking = null;
-			this.globalTimer.setTimeRemaining(this.settings.midgameBreakTime * milliseconds);
-			this.globalTimer.registerCompleteCallback(() => {
-				this.gameState = "prep";
-				this.globalTimer.setTimeRemaining(this.settings.prepTime * milliseconds);
-				this.globalTimer.registerCompleteCallback(() => {
-					this.gameState = "idle";
-					this.advanceEnd();
-				}, true);
-				this.globalTimer.start();
-			}, true);
-			this.globalTimer.start();
-		}
-	}
-
-	/**
-	 * Ends the midgame break (or prep time if that's in progress). Goes directly
-	 * to the idle state without stopping at prep time.
-	 *
-	 * By default, advance the end count. If this break is canceled (e.g. because an input error),
-	 * caller may pass false to prevent the end count from advancing.
-	 *
-	 * @param advanceEnd
-	 */
-	public endMidgameBreak(advanceEnd = true) {
-		if ((this.mode === "game" && this.gameState === "midgame-break") || this.gameState === "prep") {
-			this.globalTimer.setTimeRemaining(0, true);
-			if (advanceEnd) {
-				this.advanceEnd();
-			}
-			this.gameState = "idle";
 		}
 	}
 
@@ -941,16 +1023,16 @@ export class CurlingTimer {
 				}
 				this.team2Timeouts--;
 			}
-			this.gameState = `${defaultedSide}-travel`;
+			this.setGameState(`${defaultedSide}-travel`);
 			this.team1Timer.pause();
 			this.team2Timer.pause();
 			this.globalTimer.setTimeRemaining(travelTime * milliseconds);
 			this.teamTimedOut = team;
 			this.globalTimer.registerCompleteCallback(() => {
-				this.gameState = "timeout";
+				this.setGameState("timeout");
 				this.globalTimer.setTimeRemaining(this.settings.timeoutTime * milliseconds);
 				this.globalTimer.registerCompleteCallback(() => {
-					this.gameState = "idle";
+					this.setGameState("idle");
 					this.teamTimedOut = null;
 				}, true);
 				this.globalTimer.start();
@@ -961,11 +1043,16 @@ export class CurlingTimer {
 
 	/**
 	 * Ends the travel time, which immediately begins the timeout time.
+	 *
+	 * @returns true if a travel time was stopped, false if it ended up being
+	 * a no-op.
 	 */
-	public endTravelTime() {
+	public endTravelTime(): boolean {
 		if (this.gameState === "home-travel" || this.gameState === "away-travel") {
 			this.globalTimer.setTimeRemaining(0);
+			return true;
 		}
+		return false;
 	}
 
 	/**
@@ -974,7 +1061,11 @@ export class CurlingTimer {
 	 */
 	public endTimeout(replenishTimeout = false) {
 		const teamTimedOut = this.teamTimedOut;
+		if (this.gameState === "away-travel" || this.gameState === "home-travel") {
+			this.suppressNextStateChange();
+		}
 		this.endTravelTime();
+
 		if (teamTimedOut) {
 			this.globalTimer.setTimeRemaining(0);
 			if (replenishTimeout) {
