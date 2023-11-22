@@ -5,6 +5,7 @@ import {
 	BasicTimer,
 	ThinkingTimeBlock,
 	CurlingTimer,
+	CurlingTimerState,
 } from "../lib/headless-curling-timer";
 import { SuperCountdown } from "@trevorsg/super-timer";
 
@@ -600,38 +601,68 @@ test("State change callbacks", async () => {
 	const callback = mock(() => {});
 	timer.addEventListener("statechange", callback);
 	timer.startGame();
+	await Bun.sleep(0);
 	expect(callback).toHaveBeenCalledTimes(1);
 	timer.startThinking(1);
+	await Bun.sleep(0)
 	expect(callback).toHaveBeenCalledTimes(2);
 	timer.stopThinking();
+	await Bun.sleep(0)
 	expect(callback).toHaveBeenCalledTimes(3);
 	timer.startTimeout(1);
 	expect(timer.getFullState().gameState).toBe("away-travel");
+	await Bun.sleep(0)
 	expect(callback).toHaveBeenCalledTimes(4);
 	timer.endTimeout(); // travel + timeout = 1 state change
 	expect(timer.getFullState().gameState).toBe("idle");
+	await Bun.sleep(0)
 	expect(callback).toHaveBeenCalledTimes(5);
 	timer.betweenEnds();
+	await Bun.sleep(0)
 	expect(callback).toHaveBeenCalledTimes(6);
 	timer.endBetweenEnds(); // between ends + prep = 1 state change
+	await Bun.sleep(0)
 	expect(callback).toHaveBeenCalledTimes(7);
 	timer.midgameBreak();
+	await Bun.sleep(0)
 	expect(callback).toHaveBeenCalledTimes(8);
 	timer.endMidgameBreak(true);
+	await Bun.sleep(0)
 	expect(callback).toHaveBeenCalledTimes(9);
 	timer.betweenEnds();
-	expect(callback).toHaveBeenCalledTimes(10);
-	await Bun.sleep(17);
+	await Bun.sleep(16);
 	expect(callback).toHaveBeenCalledTimes(11);
 	await Bun.sleep(10);
 	expect(callback).toHaveBeenCalledTimes(12);
 	timer.startTimeout(2);
-	expect(callback).toHaveBeenCalledTimes(13);
-	await Bun.sleep(17);
+	await Bun.sleep(11);
 	expect(callback).toHaveBeenCalledTimes(14);
-	await Bun.sleep(10);
+	await Bun.sleep(15);
 	expect(callback).toHaveBeenCalledTimes(15);
 	expect(timer.getFullState().gameState).toBe("idle");
+});
+
+test("State change occurs in next event loop", async () => {
+	const config = getStandardConfig("10end");
+	config.betweenEndTime = 15;
+	config.prepTime = 10;
+	config.timeoutTime = 15;
+	config.awayTravelTime = 10;
+	config.homeTravelTime = 10;
+	config.timerSpeedMultiplier = 1000;
+	const timer = new CurlingTimer(config);
+	let state: CurlingTimerState | null = null;
+	const callback = mock(nextState => {
+		state = nextState;
+	});
+	timer.addEventListener("statechange", callback);
+	timer.startGame();
+	timer.startThinking(1);
+	timer.startTimeout(1);
+	expect(callback).toHaveBeenCalledTimes(0);
+	await Bun.sleep(0);
+	expect(callback).toHaveBeenCalledTimes(3);
+	expect(state).not.toBe(null);
 });
 
 test("Countdown complete callbacks", async () => {

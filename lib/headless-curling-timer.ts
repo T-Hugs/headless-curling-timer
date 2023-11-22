@@ -276,6 +276,11 @@ export interface CurlingTimerState {
 	 * to the same object that was passed into the Timer constructor.
 	 */
 	settings: CurlingTimerSettings;
+
+	/**
+	 * A snapshot of the full game state taken at the conclusion of each end.
+	 */
+	endSnapshots: CurlingTimerState[] | undefined;
 }
 
 export interface BasicTimerSettings {
@@ -516,6 +521,7 @@ export class CurlingTimer {
 	private hammerTeam: 1 | 2 | null = null;
 	private eventListeners: Map<string, ((state: CurlingTimerState) => void)[]> = new Map();
 	private stateChangesToSuppress: number = 0;
+	private endSnapshots: CurlingTimerState[] = [];
 
 	constructor(settings: CurlingTimerSettings) {
 		if (settings.timerSpeedMultiplier !== 1.0 && !isBunTestEnv()) {
@@ -551,12 +557,7 @@ export class CurlingTimer {
 	}
 
 	private countdownComplete() {
-		const countdownCompleteListeners = this.eventListeners.get("countdowncomplete");
-		if (countdownCompleteListeners) {
-			for (const listener of countdownCompleteListeners) {
-				listener(this.getFullState());
-			}
-		}
+		this.fireEventListeners("countdowncomplete");
 	}
 
 	private getCurrentThinkingTimeBlock() {
@@ -612,7 +613,7 @@ export class CurlingTimer {
 		if (this.mode === mode) {
 			return;
 		}
-		
+
 		this.mode = mode;
 		if (mode === "game") {
 			this.gameState = "idle";
@@ -626,12 +627,18 @@ export class CurlingTimer {
 		}
 
 		// call any event listeners
-		const stateChangeListeners = this.eventListeners.get("statechange");
-		if (stateChangeListeners) {
-			for (const listener of stateChangeListeners) {
-				listener(this.getFullState());
+		this.fireEventListeners("statechange");
+	}
+
+	private fireEventListeners(eventName: string) {
+		setImmediate(() => {
+			const listeners = this.eventListeners.get(eventName);
+			if (listeners) {
+				for (const listener of listeners) {
+					listener(this.getFullState());
+				}
 			}
-		}
+		});
 	}
 
 	private setGameState(gameState: CurlingTimerGameState | null) {
@@ -647,12 +654,7 @@ export class CurlingTimer {
 		}
 
 		// call any event listeners
-		const stateChangeListeners = this.eventListeners.get("statechange");
-		if (stateChangeListeners) {
-			for (const listener of stateChangeListeners) {
-				listener(this.getFullState());
-			}
-		}
+		this.fireEventListeners("statechange");
 	}
 
 	public get timers() {
@@ -731,7 +733,6 @@ export class CurlingTimer {
 		const thinkingTime = thinkingTimeBlock ? thinkingTimeBlock.thinkingTime : 3600;
 		this.team1Timer.setTimeRemaining(thinkingTime * milliseconds);
 		this.team2Timer.setTimeRemaining(thinkingTime * milliseconds);
-		this.globalTimer.start();
 	}
 
 	/**
@@ -896,15 +897,14 @@ export class CurlingTimer {
 			this.stopThinking();
 			this.setGameState(isMidgameBreak ? "midgame-break" : "between-ends");
 			this.hammerTeam = null;
-			this.globalTimer.setTimeRemaining(
-				(isMidgameBreak ? this.settings.midgameBreakTime : this.settings.betweenEndTime) * milliseconds,
-			);
+			const breakTime =
+				(isMidgameBreak ? this.settings.midgameBreakTime : this.settings.betweenEndTime) * milliseconds;
+			this.globalTimer.setTimeRemaining(breakTime);
 			this.globalTimer.registerCompleteCallback(() => {
 				this.setGameState("prep");
 				this.globalTimer.setTimeRemaining(this.settings.prepTime * milliseconds);
 				this.globalTimer.registerCompleteCallback(() => {
 					this.advanceEnd();
-					this.setGameState("idle");
 				}, true);
 				this.globalTimer.start();
 			}, true);
@@ -930,12 +930,20 @@ export class CurlingTimer {
 
 	private _endBetweenEnds(isMidgameBreak: boolean, advanceEnd = true) {
 		const relevantGameState = isMidgameBreak ? "midgame-break" : "between-ends";
-		if (this.mode === "game" && (this.gameState === relevantGameState || this.gameState === "prep")) {
-			this.globalTimer.setTimeRemaining(0, true);
-			if (advanceEnd) {
-				this.advanceEnd();
+		if (this.gameState === relevantGameState) {
+			this.suppressNextStateChange();
+			this.globalTimer.setTimeRemaining(0);
+		}
+		if (this.gameState === "prep") {
+			if (!advanceEnd) {
+				// If we need to go back, don't dispatch an unnecessary state change event.
+				this.suppressNextStateChange();
 			}
-			this.setGameState("idle");
+			this.globalTimer.setTimeRemaining(0);
+		}
+		if (!advanceEnd) {
+			this.goToEnd(this.end - 1, true);
+			this.endSnapshots.pop();
 		}
 	}
 	/**
@@ -970,6 +978,7 @@ export class CurlingTimer {
 	 *   - Set stone count to null
 	 */
 	public advanceEnd() {
+		this.endSnapshots.push(this.serialize());
 		this.lastThinkingTeam = null;
 		this.hammerTeam = null;
 		const currentThinkingTimeBlock = this.getCurrentThinkingTimeBlock();
@@ -977,6 +986,7 @@ export class CurlingTimer {
 		const nextThinkingTimeBlock = this.getCurrentThinkingTimeBlock();
 		this.currentTeam1Stone = null;
 		this.currentTeam2Stone = null;
+		this.setGameState("idle");
 
 		if (currentThinkingTimeBlock === nextThinkingTimeBlock) {
 			// The next end uses the same block of thinking time as the previous
@@ -989,6 +999,50 @@ export class CurlingTimer {
 			// The next end uses a different block of thinking time
 			this.team1Timer.setTimeRemaining(nextThinkingTimeBlock.thinkingTime * milliseconds);
 			this.team2Timer.setTimeRemaining(nextThinkingTimeBlock.thinkingTime * milliseconds);
+		}
+	}
+
+	/**
+	 * Replay the end specified by endNumber.
+	 *
+	 * Be default, go to the beginning of that end, but pass conclusion=true to
+	 * advance to the end of the specified end.
+	 *
+	 * In the event that there are multiple instances of an end having been played,
+	 * you may specify how far back in the history to go. For example, if the 3rd
+	 * end was played 3 times, you can specify version=3 to replay the FIRST of
+	 * those 3 ends. A version of 1 always refers to the most recent instance of
+	 * that end being played.
+	 *
+	 * @param endNumber
+	 * @param conclusion
+	 * @param version
+	 */
+	public goToEnd(endNumber: number, conclusion = false, version: number = 1) {
+		if (endNumber === 1 && !conclusion) {
+			this.startGame();
+		} else {
+			const filteredEnds = this.endSnapshots.filter(state => state.end === endNumber - (conclusion ? 0 : 1));
+			const endToReplay = filteredEnds[filteredEnds.length - version];
+			if (!endToReplay) {
+				throw new Error("No such end");
+			}
+
+			this.team1Timer.setTimeRemaining(endToReplay.team1Time);
+			this.team2Timer.setTimeRemaining(endToReplay.team2Time);
+			this.globalTimer.setTimeRemaining(endToReplay.globalTime);
+			this.end = endToReplay.end;
+			this.team1Timeouts = endToReplay.team1Timeouts;
+			this.team2Timeouts = endToReplay.team2Timeouts;
+			this.gameState = "idle";
+			this.hammerTeam = endToReplay.hammerTeam;
+			this.lastThinkingTeam = null;
+			this.currentTeam1Stone = conclusion ? this.settings.stonesPerEnd : null;
+			this.currentTeam2Stone = conclusion ? this.settings.stonesPerEnd : null;
+			this.teamThinking = null;
+			this.teamTimedOut = null;
+			this.stateChangesToSuppress = 0;
+			this.fireEventListeners("statechange");
 		}
 	}
 
@@ -1126,7 +1180,7 @@ export class CurlingTimer {
 	 * is safely JSON-serializable.
 	 * @returns
 	 */
-	public getFullState(): CurlingTimerState {
+	public getFullState(includeEndSnapshots = false): CurlingTimerState {
 		return {
 			mode: this.mode,
 			gameState: this.gameState,
@@ -1146,6 +1200,7 @@ export class CurlingTimer {
 			lastThinkingTeam: this.lastThinkingTeam,
 			hammerTeam: this.hammerTeam,
 			settings: this.settings,
+			endSnapshots: includeEndSnapshots ? this.endSnapshots : undefined,
 		};
 	}
 
