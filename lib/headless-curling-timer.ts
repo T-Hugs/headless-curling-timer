@@ -520,7 +520,8 @@ export class CurlingTimer {
 	private lastThinkingTeam: 1 | 2 | null = null;
 	private hammerTeam: 1 | 2 | null = null;
 	private eventListeners: Map<string, ((state: CurlingTimerState) => void)[]> = new Map();
-	private stateChangesToSuppress: number = 0;
+	private batchedStateChangeCount: number = 0;
+	private stateChangeBatchDepth: number = 0;
 	private endSnapshots: CurlingTimerState[] = [];
 
 	constructor(settings: CurlingTimerSettings) {
@@ -552,12 +553,49 @@ export class CurlingTimer {
 		this.teamThinking = null;
 	}
 
-	private suppressNextStateChange() {
-		this.stateChangesToSuppress++;
+	private beginStateChangeBatch() {
+		this.stateChangeBatchDepth++;
+		if (this.batchedStateChangeCount === 0) {
+			this.batchedStateChangeCount = 1;
+		}
+	}
+
+	private endStateChangeBatch() {
+		this.stateChangeBatchDepth--;
+		if (this.stateChangeBatchDepth <= 0) {
+			if (this.batchedStateChangeCount > 0) {
+				this.fireEventListeners("statechange");
+			}
+			this.batchedStateChangeCount = 0;
+		}
+		if (this.stateChangeBatchDepth < 0) {
+			this.stateChangeBatchDepth = 0;
+		}
 	}
 
 	private countdownComplete() {
 		this.fireEventListeners("countdowncomplete");
+	}
+
+	private triggerStateChange() {
+		// If we're not in a batch just fire the listeners
+		if (this.batchedStateChangeCount === 0) {
+			this.fireEventListeners("statechange");
+		}
+
+		// Otherwise add to the batch and move on
+		this.batchedStateChangeCount++;
+	}
+
+	private fireEventListeners(eventName: string) {
+		setImmediate(() => {
+			const listeners = this.eventListeners.get(eventName);
+			if (listeners) {
+				for (const listener of listeners) {
+					listener(this.getFullState());
+				}
+			}
+		});
 	}
 
 	private getCurrentThinkingTimeBlock() {
@@ -620,25 +658,7 @@ export class CurlingTimer {
 		} else {
 			this.gameState = null;
 		}
-
-		if (this.stateChangesToSuppress > 0) {
-			this.stateChangesToSuppress--;
-			return;
-		}
-
-		// call any event listeners
-		this.fireEventListeners("statechange");
-	}
-
-	private fireEventListeners(eventName: string) {
-		setImmediate(() => {
-			const listeners = this.eventListeners.get(eventName);
-			if (listeners) {
-				for (const listener of listeners) {
-					listener(this.getFullState());
-				}
-			}
-		});
+		this.triggerStateChange();
 	}
 
 	private setGameState(gameState: CurlingTimerGameState | null) {
@@ -647,14 +667,7 @@ export class CurlingTimer {
 		}
 
 		this.gameState = gameState;
-
-		if (this.stateChangesToSuppress > 0) {
-			this.stateChangesToSuppress--;
-			return;
-		}
-
-		// call any event listeners
-		this.fireEventListeners("statechange");
+		this.triggerStateChange();
 	}
 
 	public get timers() {
@@ -687,36 +700,52 @@ export class CurlingTimer {
 		this.team1Timer.dispose();
 		this.team2Timer.dispose();
 		this.globalTimer.dispose();
+		this.fireEventListeners("dispose");
 	}
 
 	/**
 	 * Starts the practice period.
 	 */
 	public startPractice() {
-		this.setMode("practice");
-		this.setGameState(null);
-		this.globalTimer.setTimeRemaining(this.settings.practiceTime * milliseconds);
-		this.globalTimer.start();
+		try {
+			this.beginStateChangeBatch();
+			this.setMode("practice");
+			this.setGameState(null);
+			this.globalTimer.setTimeRemaining(this.settings.practiceTime * milliseconds);
+			this.globalTimer.start();
+		} finally {
+			this.endStateChangeBatch();
+		}
 	}
 
 	/**
 	 * Starts the warm-up period.
 	 */
 	public startWarmup() {
-		this.setMode("warmup");
-		this.setGameState(null);
-		this.globalTimer.setTimeRemaining(this.settings.warmupTime * milliseconds);
-		this.globalTimer.start();
+		try {
+			this.beginStateChangeBatch();
+			this.setMode("warmup");
+			this.setGameState(null);
+			this.globalTimer.setTimeRemaining(this.settings.warmupTime * milliseconds);
+			this.globalTimer.start();
+		} finally {
+			this.endStateChangeBatch();
+		}
 	}
 
 	/**
 	 * Starts the timer for the last stone draw.
 	 */
 	public startLSFE() {
-		this.setMode("lsfe");
-		this.setGameState(null);
-		this.globalTimer.setTimeRemaining(this.settings.lsfeTime * milliseconds);
-		this.globalTimer.start();
+		try {
+			this.beginStateChangeBatch();
+			this.setMode("lsfe");
+			this.setGameState(null);
+			this.globalTimer.setTimeRemaining(this.settings.lsfeTime * milliseconds);
+			this.globalTimer.start();
+		} finally {
+			this.endStateChangeBatch();
+		}
 	}
 
 	/**
@@ -724,15 +753,20 @@ export class CurlingTimer {
 	 * values.
 	 */
 	public startGame(hammerTeam?: 1 | 2) {
-		this.setMode("game");
-		this.end = 1;
-		this.currentTeam1Stone = null;
-		this.currentTeam1Stone = null;
-		this.hammerTeam = hammerTeam ?? null;
-		const thinkingTimeBlock = this.getCurrentThinkingTimeBlock();
-		const thinkingTime = thinkingTimeBlock ? thinkingTimeBlock.thinkingTime : 3600;
-		this.team1Timer.setTimeRemaining(thinkingTime * milliseconds);
-		this.team2Timer.setTimeRemaining(thinkingTime * milliseconds);
+		try {
+			this.beginStateChangeBatch();
+			this.setMode("game");
+			this.end = 1;
+			this.currentTeam1Stone = null;
+			this.currentTeam1Stone = null;
+			this.hammerTeam = hammerTeam ?? null;
+			const thinkingTimeBlock = this.getCurrentThinkingTimeBlock();
+			const thinkingTime = thinkingTimeBlock ? thinkingTimeBlock.thinkingTime : 3600;
+			this.team1Timer.setTimeRemaining(thinkingTime * milliseconds);
+			this.team2Timer.setTimeRemaining(thinkingTime * milliseconds);
+		} finally {
+			this.endStateChangeBatch();
+		}
 	}
 
 	/**
@@ -741,9 +775,14 @@ export class CurlingTimer {
 	 * will resume the same timer.
 	 */
 	public pause() {
-		this.team1Timer.pause();
-		this.team2Timer.pause();
-		this.globalTimer.pause();
+		try {
+			this.beginStateChangeBatch();
+			this.team1Timer.pause();
+			this.team2Timer.pause();
+			this.globalTimer.pause();
+		} finally {
+			this.endStateChangeBatch();
+		}
 	}
 
 	/**
@@ -752,7 +791,12 @@ export class CurlingTimer {
 	public unpause() {
 		const timer = this.getTimer();
 		if (timer) {
-			timer.unpause();
+			try {
+				this.beginStateChangeBatch();
+				timer.unpause();
+			} finally {
+				this.endStateChangeBatch();
+			}
 		}
 	}
 
@@ -764,51 +808,60 @@ export class CurlingTimer {
 	 */
 	public startThinking(team: 1 | 2) {
 		if (this.mode === "game") {
-			this.setGameState("thinking");
-			this.teamThinking = team;
-			const { timer, otherTimer } = this.getThinkingTimers(team);
-			otherTimer.pause();
-			this.globalTimer.pause();
-			timer.start();
+			try {
+				this.beginStateChangeBatch();
+				this.setGameState("thinking");
+				this.teamThinking = team;
+				const { timer, otherTimer } = this.getThinkingTimers(team);
+				otherTimer.pause();
+				this.globalTimer.pause();
+				timer.start();
 
-			// If the hammer team is set, this is the first thinking time of the end,
-			// and the team thinking is the hammer team, then advance the stone count
-			// of the non-hammer team (since they have already thrown for the end
-			// without using any thinking time).
-			if (
-				this.hammerTeam !== null &&
-				this.currentTeam1Stone === null &&
-				this.currentTeam2Stone === null &&
-				this.hammerTeam === team
-			) {
-				if (this.hammerTeam === 1) {
-					this.currentTeam2Stone = 1;
-				} else {
-					this.currentTeam1Stone = 1;
+				// If the hammer team is set, this is the first thinking time of the end,
+				// and the team thinking is the hammer team, then advance the stone count
+				// of the non-hammer team (since they have already thrown for the end
+				// without using any thinking time).
+				if (
+					this.hammerTeam !== null &&
+					this.currentTeam1Stone === null &&
+					this.currentTeam2Stone === null &&
+					this.hammerTeam === team
+				) {
+					if (this.hammerTeam === 1) {
+						this.currentTeam2Stone = 1;
+					} else {
+						this.currentTeam1Stone = 1;
+					}
 				}
+
+				// Unless this is a restart of the most recent throwing team's thinking
+				// time, advance the stone count.
+				if (team === 1 && this.lastThinkingTeam !== 1) {
+					if (this.currentTeam1Stone === null) {
+						this.currentTeam1Stone = 1;
+					} else {
+						this.currentTeam1Stone++;
+					}
+				} else if (team === 2 && this.lastThinkingTeam !== 2) {
+					if (this.currentTeam2Stone === null) {
+						this.currentTeam2Stone = 1;
+					} else {
+						this.currentTeam2Stone++;
+					}
+				}
+				this.currentTeam1Stone =
+					this.currentTeam1Stone === null
+						? null
+						: Math.min(this.currentTeam1Stone, this.settings.stonesPerEnd);
+				this.currentTeam2Stone =
+					this.currentTeam2Stone === null
+						? null
+						: Math.min(this.currentTeam2Stone, this.settings.stonesPerEnd);
+
+				this.lastThinkingTeam = team;
+			} finally {
+				this.endStateChangeBatch();
 			}
-
-			// Unless this is a restart of the most recent throwing team's thinking
-			// time, advance the stone count.
-			if (team === 1 && this.lastThinkingTeam !== 1) {
-				if (this.currentTeam1Stone === null) {
-					this.currentTeam1Stone = 1;
-				} else {
-					this.currentTeam1Stone++;
-				}
-			} else if (team === 2 && this.lastThinkingTeam !== 2) {
-				if (this.currentTeam2Stone === null) {
-					this.currentTeam2Stone = 1;
-				} else {
-					this.currentTeam2Stone++;
-				}
-			}
-			this.currentTeam1Stone =
-				this.currentTeam1Stone === null ? null : Math.min(this.currentTeam1Stone, this.settings.stonesPerEnd);
-			this.currentTeam2Stone =
-				this.currentTeam2Stone === null ? null : Math.min(this.currentTeam2Stone, this.settings.stonesPerEnd);
-
-			this.lastThinkingTeam = team;
 		}
 	}
 
@@ -821,12 +874,17 @@ export class CurlingTimer {
 	 */
 	public stopThinking(): boolean {
 		if (this.mode === "game") {
-			const returnVal = this.gameState === "thinking";
-			this.setGameState("idle");
-			this.teamThinking = null;
-			this.team1Timer.pause();
-			this.team2Timer.pause();
-			return returnVal;
+			try {
+				this.beginStateChangeBatch();
+				const returnVal = this.gameState === "thinking";
+				this.setGameState("idle");
+				this.teamThinking = null;
+				this.team1Timer.pause();
+				this.team2Timer.pause();
+				return returnVal;
+			} finally {
+				this.endStateChangeBatch();
+			}
 		}
 		return false;
 	}
@@ -843,25 +901,30 @@ export class CurlingTimer {
 			if (nextStoneNumber < 1 || nextStoneNumber > this.settings.stonesPerEnd) {
 				throw new Error("Invalid stone number");
 			}
-			const currentStone = nextStoneNumber === 1 ? null : nextStoneNumber - 1;
-			this.currentTeam1Stone = currentStone;
-			this.currentTeam2Stone = currentStone;
+			try {
+				this.beginStateChangeBatch();
+				const currentStone = nextStoneNumber === 1 ? null : nextStoneNumber - 1;
+				this.currentTeam1Stone = currentStone;
+				this.currentTeam2Stone = currentStone;
 
-			// If non-hammer team has already thrown, advance their stone count
-			if (this.lastThinkingTeam !== this.hammerTeam) {
-				if (this.lastThinkingTeam === 1) {
-					if (this.currentTeam1Stone === null) {
-						this.currentTeam1Stone = 1;
-					} else {
-						this.currentTeam1Stone++;
-					}
-				} else if (this.lastThinkingTeam === 2) {
-					if (this.currentTeam2Stone === null) {
-						this.currentTeam2Stone = 1;
-					} else {
-						this.currentTeam2Stone++;
+				// If non-hammer team has already thrown, advance their stone count
+				if (this.lastThinkingTeam !== this.hammerTeam) {
+					if (this.lastThinkingTeam === 1) {
+						if (this.currentTeam1Stone === null) {
+							this.currentTeam1Stone = 1;
+						} else {
+							this.currentTeam1Stone++;
+						}
+					} else if (this.lastThinkingTeam === 2) {
+						if (this.currentTeam2Stone === null) {
+							this.currentTeam2Stone = 1;
+						} else {
+							this.currentTeam2Stone++;
+						}
 					}
 				}
+			} finally {
+				this.endStateChangeBatch();
 			}
 		}
 	}
@@ -872,8 +935,13 @@ export class CurlingTimer {
 	 * @param team
 	 */
 	public setHammerTeam(team: 1 | 2) {
-		if (this.mode === "game") {
-			this.hammerTeam = team;
+		if (this.mode === "game" && this.hammerTeam !== team) {
+			try {
+				this.beginStateChangeBatch();
+				this.hammerTeam = team;
+			} finally {
+				this.endStateChangeBatch();
+			}
 		}
 	}
 
@@ -886,29 +954,38 @@ export class CurlingTimer {
 		if (end < 1 || end > this.settings.endCount) {
 			throw new Error("Invalid end number");
 		}
-		this.end = end;
+		if (this.end !== end) {
+			try {
+				this.beginStateChangeBatch();
+				this.end = end;
+			} finally {
+				this.endStateChangeBatch();
+			}
+		}
 	}
 
 	private _betweenEnds(isMidgameBreak: boolean) {
 		if (this.mode === "game") {
-			if (this.gameState === "thinking") {
-				this.suppressNextStateChange();
-			}
-			this.stopThinking();
-			this.setGameState(isMidgameBreak ? "midgame-break" : "between-ends");
-			this.hammerTeam = null;
-			const breakTime =
-				(isMidgameBreak ? this.settings.midgameBreakTime : this.settings.betweenEndTime) * milliseconds;
-			this.globalTimer.setTimeRemaining(breakTime);
-			this.globalTimer.registerCompleteCallback(() => {
-				this.setGameState("prep");
-				this.globalTimer.setTimeRemaining(this.settings.prepTime * milliseconds);
+			try {
+				this.beginStateChangeBatch();
+				this.stopThinking();
+				this.setGameState(isMidgameBreak ? "midgame-break" : "between-ends");
+				this.hammerTeam = null;
+				const breakTime =
+					(isMidgameBreak ? this.settings.midgameBreakTime : this.settings.betweenEndTime) * milliseconds;
+				this.globalTimer.setTimeRemaining(breakTime);
 				this.globalTimer.registerCompleteCallback(() => {
-					this.advanceEnd();
+					this.setGameState("prep");
+					this.globalTimer.setTimeRemaining(this.settings.prepTime * milliseconds);
+					this.globalTimer.registerCompleteCallback(() => {
+						this.advanceEnd();
+					}, true);
+					this.globalTimer.start();
 				}, true);
 				this.globalTimer.start();
-			}, true);
-			this.globalTimer.start();
+			} finally {
+				this.endStateChangeBatch();
+			}
 		}
 	}
 
@@ -929,21 +1006,21 @@ export class CurlingTimer {
 	}
 
 	private _endBetweenEnds(isMidgameBreak: boolean, advanceEnd = true) {
-		const relevantGameState = isMidgameBreak ? "midgame-break" : "between-ends";
-		if (this.gameState === relevantGameState) {
-			this.suppressNextStateChange();
-			this.globalTimer.setTimeRemaining(0);
-		}
-		if (this.gameState === "prep") {
-			if (!advanceEnd) {
-				// If we need to go back, don't dispatch an unnecessary state change event.
-				this.suppressNextStateChange();
+		try {
+			this.beginStateChangeBatch();
+			const relevantGameState = isMidgameBreak ? "midgame-break" : "between-ends";
+			if (this.gameState === relevantGameState) {
+				this.globalTimer.setTimeRemaining(0);
 			}
-			this.globalTimer.setTimeRemaining(0);
-		}
-		if (!advanceEnd) {
-			this.goToEnd(this.end - 1, true);
-			this.endSnapshots.pop();
+			if (this.gameState === "prep") {
+				this.globalTimer.setTimeRemaining(0);
+			}
+			if (!advanceEnd) {
+				this.goToEnd(this.end - 1, true);
+				this.endSnapshots.pop();
+			}
+		} finally {
+			this.endStateChangeBatch();
 		}
 	}
 	/**
@@ -978,27 +1055,31 @@ export class CurlingTimer {
 	 *   - Set stone count to null
 	 */
 	public advanceEnd() {
-		this.endSnapshots.push(this.serialize());
-		this.lastThinkingTeam = null;
-		this.hammerTeam = null;
-		const currentThinkingTimeBlock = this.getCurrentThinkingTimeBlock();
-		this.end++;
-		const nextThinkingTimeBlock = this.getCurrentThinkingTimeBlock();
-		this.currentTeam1Stone = null;
-		this.currentTeam2Stone = null;
-		this.setGameState("idle");
+		try {
+			this.beginStateChangeBatch();
+			this.endSnapshots.push(this.serialize());
+			this.lastThinkingTeam = null;
+			this.hammerTeam = null;
+			const currentThinkingTimeBlock = this.getCurrentThinkingTimeBlock();
+			this.end++;
+			const nextThinkingTimeBlock = this.getCurrentThinkingTimeBlock();
+			this.currentTeam1Stone = null;
+			this.currentTeam2Stone = null;
+			this.setGameState("idle");
 
-		if (currentThinkingTimeBlock === nextThinkingTimeBlock) {
-			// The next end uses the same block of thinking time as the previous
-			return;
-		} else if (nextThinkingTimeBlock === null) {
-			// The next end is an extra end
-			this.team1Timer.setTimeRemaining(this.settings.extraEndTime * milliseconds);
-			this.team2Timer.setTimeRemaining(this.settings.extraEndTime * milliseconds);
-		} else {
-			// The next end uses a different block of thinking time
-			this.team1Timer.setTimeRemaining(nextThinkingTimeBlock.thinkingTime * milliseconds);
-			this.team2Timer.setTimeRemaining(nextThinkingTimeBlock.thinkingTime * milliseconds);
+			if (currentThinkingTimeBlock === nextThinkingTimeBlock) {
+				// The next end uses the same block of thinking time as the previous
+			} else if (nextThinkingTimeBlock === null) {
+				// The next end is an extra end
+				this.team1Timer.setTimeRemaining(this.settings.extraEndTime * milliseconds);
+				this.team2Timer.setTimeRemaining(this.settings.extraEndTime * milliseconds);
+			} else {
+				// The next end uses a different block of thinking time
+				this.team1Timer.setTimeRemaining(nextThinkingTimeBlock.thinkingTime * milliseconds);
+				this.team2Timer.setTimeRemaining(nextThinkingTimeBlock.thinkingTime * milliseconds);
+			}
+		} finally {
+			this.endStateChangeBatch();
 		}
 	}
 
@@ -1019,30 +1100,34 @@ export class CurlingTimer {
 	 * @param version
 	 */
 	public goToEnd(endNumber: number, conclusion = false, version: number = 1) {
-		if (endNumber === 1 && !conclusion) {
-			this.startGame();
-		} else {
-			const filteredEnds = this.endSnapshots.filter(state => state.end === endNumber - (conclusion ? 0 : 1));
-			const endToReplay = filteredEnds[filteredEnds.length - version];
-			if (!endToReplay) {
-				throw new Error("No such end");
-			}
+		try {
+			this.beginStateChangeBatch();
+			if (endNumber === 1 && !conclusion) {
+				this.startGame();
+			} else {
+				const filteredEnds = this.endSnapshots.filter(state => state.end === endNumber - (conclusion ? 0 : 1));
+				const endToReplay = filteredEnds[filteredEnds.length - version];
+				if (!endToReplay) {
+					throw new Error("No such end");
+				}
 
-			this.team1Timer.setTimeRemaining(endToReplay.team1Time);
-			this.team2Timer.setTimeRemaining(endToReplay.team2Time);
-			this.globalTimer.setTimeRemaining(endToReplay.globalTime);
-			this.end = endToReplay.end;
-			this.team1Timeouts = endToReplay.team1Timeouts;
-			this.team2Timeouts = endToReplay.team2Timeouts;
-			this.gameState = "idle";
-			this.hammerTeam = endToReplay.hammerTeam;
-			this.lastThinkingTeam = null;
-			this.currentTeam1Stone = conclusion ? this.settings.stonesPerEnd : null;
-			this.currentTeam2Stone = conclusion ? this.settings.stonesPerEnd : null;
-			this.teamThinking = null;
-			this.teamTimedOut = null;
-			this.stateChangesToSuppress = 0;
-			this.fireEventListeners("statechange");
+				this.team1Timer.setTimeRemaining(endToReplay.team1Time);
+				this.team2Timer.setTimeRemaining(endToReplay.team2Time);
+				this.globalTimer.setTimeRemaining(endToReplay.globalTime);
+				this.end = endToReplay.end;
+				this.team1Timeouts = endToReplay.team1Timeouts;
+				this.team2Timeouts = endToReplay.team2Timeouts;
+				this.gameState = "idle";
+				this.hammerTeam = endToReplay.hammerTeam;
+				this.lastThinkingTeam = null;
+				this.currentTeam1Stone = conclusion ? this.settings.stonesPerEnd : null;
+				this.currentTeam2Stone = conclusion ? this.settings.stonesPerEnd : null;
+				this.teamThinking = null;
+				this.teamTimedOut = null;
+				this.batchedStateChangeCount = 0;
+			}
+		} finally {
+			this.endStateChangeBatch();
 		}
 	}
 
@@ -1062,36 +1147,52 @@ export class CurlingTimer {
 	 * @param side
 	 */
 	public startTimeout(team: 1 | 2, side?: "home" | "away") {
-		const autoSide = this.end % 2 === 0 ? "home" : "away";
-		const defaultedSide = side ?? autoSide;
-		const travelTime = defaultedSide === "home" ? this.settings.homeTravelTime : this.settings.awayTravelTime;
 		if (this.mode === "game") {
-			if (team === 1) {
-				if (this.team1Timeouts < 1) {
-					return;
+			try {
+				this.beginStateChangeBatch();
+				const autoSide = this.end % 2 === 0 ? "home" : "away";
+				const defaultedSide = side ?? autoSide;
+				const travelTime =
+					defaultedSide === "home" ? this.settings.homeTravelTime : this.settings.awayTravelTime;
+				if (team === 1) {
+					if (this.team1Timeouts < 1) {
+						return;
+					}
+					this.team1Timeouts--;
+				} else {
+					if (this.team2Timeouts < 1) {
+						return;
+					}
+					this.team2Timeouts--;
 				}
-				this.team1Timeouts--;
-			} else {
-				if (this.team2Timeouts < 1) {
-					return;
-				}
-				this.team2Timeouts--;
-			}
-			this.setGameState(`${defaultedSide}-travel`);
-			this.team1Timer.pause();
-			this.team2Timer.pause();
-			this.globalTimer.setTimeRemaining(travelTime * milliseconds);
-			this.teamTimedOut = team;
-			this.globalTimer.registerCompleteCallback(() => {
-				this.setGameState("timeout");
-				this.globalTimer.setTimeRemaining(this.settings.timeoutTime * milliseconds);
+				this.setGameState(`${defaultedSide}-travel`);
+				this.team1Timer.pause();
+				this.team2Timer.pause();
+				this.globalTimer.setTimeRemaining(travelTime * milliseconds);
+				this.teamTimedOut = team;
 				this.globalTimer.registerCompleteCallback(() => {
-					this.setGameState("idle");
-					this.teamTimedOut = null;
+					try {
+						this.beginStateChangeBatch();
+						this.setGameState("timeout");
+						this.globalTimer.setTimeRemaining(this.settings.timeoutTime * milliseconds);
+						this.globalTimer.registerCompleteCallback(() => {
+							try {
+								this.beginStateChangeBatch();
+								this.setGameState("idle");
+								this.teamTimedOut = null;
+							} finally {
+								this.endStateChangeBatch();
+							}
+						}, true);
+						this.globalTimer.start();
+					} finally {
+						this.endStateChangeBatch();
+					}
 				}, true);
 				this.globalTimer.start();
-			}, true);
-			this.globalTimer.start();
+			} finally {
+				this.endStateChangeBatch();
+			}
 		}
 	}
 
@@ -1103,8 +1204,13 @@ export class CurlingTimer {
 	 */
 	public endTravelTime(): boolean {
 		if (this.gameState === "home-travel" || this.gameState === "away-travel") {
-			this.globalTimer.setTimeRemaining(0);
-			return true;
+			try {
+				this.beginStateChangeBatch();
+				this.globalTimer.setTimeRemaining(0);
+				return true;
+			} finally {
+				this.endStateChangeBatch();
+			}
 		}
 		return false;
 	}
@@ -1114,21 +1220,23 @@ export class CurlingTimer {
 	 * @param replenishTimeout
 	 */
 	public endTimeout(replenishTimeout = false) {
-		const teamTimedOut = this.teamTimedOut;
-		if (this.gameState === "away-travel" || this.gameState === "home-travel") {
-			this.suppressNextStateChange();
-		}
-		this.endTravelTime();
+		try {
+			this.beginStateChangeBatch();
+			const teamTimedOut = this.teamTimedOut;
+			this.endTravelTime();
 
-		if (teamTimedOut) {
-			this.globalTimer.setTimeRemaining(0);
-			if (replenishTimeout) {
-				if (teamTimedOut === 1) {
-					this.team1Timeouts++;
-				} else {
-					this.team2Timeouts++;
+			if (teamTimedOut) {
+				this.globalTimer.setTimeRemaining(0);
+				if (replenishTimeout) {
+					if (teamTimedOut === 1) {
+						this.team1Timeouts++;
+					} else {
+						this.team2Timeouts++;
+					}
 				}
 			}
+		} finally {
+			this.endStateChangeBatch();
 		}
 	}
 
@@ -1143,7 +1251,12 @@ export class CurlingTimer {
 	public addTime(sec: number, timerName?: "team1" | "team2" | "global") {
 		const timer = this.getTimer(timerName);
 		if (timer) {
-			timer.addTime(sec * milliseconds);
+			try {
+				this.beginStateChangeBatch();
+				timer.addTime(sec * milliseconds);
+			} finally {
+				this.endStateChangeBatch();
+			}
 		}
 	}
 
@@ -1158,7 +1271,12 @@ export class CurlingTimer {
 	public setTime(secRemaining: number, timerName?: "team1" | "team2" | "global") {
 		const timer = this.getTimer(timerName);
 		if (timer) {
-			timer.setTimeRemaining(secRemaining * milliseconds);
+			try {
+				this.beginStateChangeBatch();
+				timer.setTimeRemaining(secRemaining * milliseconds);
+			} finally {
+				this.endStateChangeBatch();
+			}
 		}
 	}
 
@@ -1168,10 +1286,19 @@ export class CurlingTimer {
 	 * @param timeoutCount
 	 */
 	public setTimeoutCount(team: 1 | 2, timeoutCount: number) {
-		if (team === 1) {
-			this.team1Timeouts = timeoutCount;
-		} else {
-			this.team2Timeouts = timeoutCount;
+		try {
+			this.beginStateChangeBatch();
+			if (team === 1) {
+				if (this.team1Timeouts !== timeoutCount) {
+					this.team1Timeouts = timeoutCount;
+				}
+			} else {
+				if (this.team2Timeouts !== timeoutCount) {
+					this.team2Timeouts = timeoutCount;
+				}
+			}
+		} finally {
+			this.endStateChangeBatch();
 		}
 	}
 
