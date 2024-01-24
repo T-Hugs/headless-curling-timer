@@ -56,6 +56,18 @@ export interface CurlingTimerSettings {
 	betweenEndTime: number;
 
 	/**
+	 * The official WCF software for curling timing has a few bugs where extra
+	 * seconds are given here and there. This setting emulates those bugs by
+	 * adding 1 second to each of the following:
+	 * - Between-end break time
+	 * - Midgame break time
+	 * - Prep time
+	 * - Travel time (both home and away)
+	 * - Timeout time
+	 */
+	emulateWcfCurlTime: boolean;
+
+	/**
 	 * Number of ends in the game.
 	 */
 	endCount: number;
@@ -328,6 +340,7 @@ const wcf10EndStandardSettings: CurlingTimerSettings = {
 	allowExtraEnd: true,
 	awayTravelTime: 75,
 	betweenEndTime: 60,
+	emulateWcfCurlTime: true,
 	endCount: 10,
 	extraEndTime: 4 * 60 + 30,
 	extraEndTimeoutCount: 1,
@@ -349,6 +362,7 @@ const wcf8EndStandardSettings: CurlingTimerSettings = {
 	allowExtraEnd: true,
 	awayTravelTime: 75,
 	betweenEndTime: 60,
+	emulateWcfCurlTime: true,
 	endCount: 8,
 	extraEndTime: 4 * 60 + 30,
 	extraEndTimeoutCount: 1,
@@ -370,6 +384,7 @@ const wcfMixedDoublesStandardSettings: CurlingTimerSettings = {
 	allowExtraEnd: true,
 	awayTravelTime: 75,
 	betweenEndTime: 90,
+	emulateWcfCurlTime: true,
 	endCount: 8,
 	extraEndTime: 3 * 60,
 	extraEndTimeoutCount: 1,
@@ -525,32 +540,71 @@ export class CurlingTimer {
 	private endSnapshots: CurlingTimerState[] = [];
 
 	constructor(settings: CurlingTimerSettings) {
-		if (settings.timerSpeedMultiplier !== 1.0 && !isBunTestEnv()) {
+		const _settings = structuredClone(settings);
+		if (_settings.timerSpeedMultiplier !== 1.0 && !isBunTestEnv()) {
 			console.warn(
 				"WARNING: The setting `timerSpeedMultiplier` is set to " +
-					settings.timerSpeedMultiplier +
+					_settings.timerSpeedMultiplier +
 					". The clocks will not run at the normal speed!",
 			);
 		}
 
-		validateThinkingTimeBlocks(settings.thinkingTimeBlocks, settings.endCount);
+		validateThinkingTimeBlocks(_settings.thinkingTimeBlocks, _settings.endCount);
 		this.team1Timer = new SuperCountdown(10, this.countdownComplete.bind(this), {
-			timerSpeedMultiplier: settings.timerSpeedMultiplier,
+			timerSpeedMultiplier: _settings.timerSpeedMultiplier,
 		});
 		this.team2Timer = new SuperCountdown(10, this.countdownComplete.bind(this), {
-			timerSpeedMultiplier: settings.timerSpeedMultiplier,
+			timerSpeedMultiplier: _settings.timerSpeedMultiplier,
 		});
 		this.globalTimer = new SuperCountdown(10, this.countdownComplete.bind(this), {
-			timerSpeedMultiplier: settings.timerSpeedMultiplier,
+			timerSpeedMultiplier: _settings.timerSpeedMultiplier,
 		});
-		this.team1Timeouts = settings.timeoutCount;
-		this.team2Timeouts = settings.timeoutCount;
-		this.settings = settings;
+		this.team1Timeouts = _settings.timeoutCount;
+		this.team2Timeouts = _settings.timeoutCount;
+		this.settings = _settings;
 		this.end = 0;
 		this.mode = "idle";
 		this.gameState = null;
 		this.teamTimedOut = null;
 		this.teamThinking = null;
+	}
+
+	private getTimerDuration(
+		event:
+			| "away-travel"
+			| "between-ends"
+			| "extra-end"
+			| "home-travel"
+			| "lsfe"
+			| "midgame-break"
+			| "practice"
+			| "prep"
+			| "timeout"
+			| "warmup",
+	) {
+		const wcfComp = this.settings.emulateWcfCurlTime ? 1000 : 0;
+		switch (event) {
+			case "away-travel":
+				return this.settings.awayTravelTime * milliseconds + wcfComp;
+			case "between-ends":
+				return this.settings.betweenEndTime * milliseconds + wcfComp;
+			case "extra-end":
+				return this.settings.extraEndTime * milliseconds;
+			case "home-travel":
+				return this.settings.homeTravelTime * milliseconds + wcfComp;
+			case "lsfe":
+				return this.settings.lsfeTime * milliseconds;
+			case "midgame-break":
+				return this.settings.midgameBreakTime * milliseconds + wcfComp;
+			case "practice":
+				return this.settings.practiceTime * milliseconds;
+			case "prep":
+				return this.settings.prepTime * milliseconds + wcfComp;
+			case "timeout":
+				return this.settings.timeoutTime * milliseconds + wcfComp;
+			case "warmup":
+				return this.settings.warmupTime * milliseconds;
+		}
 	}
 
 	private beginStateChangeBatch() {
@@ -711,7 +765,7 @@ export class CurlingTimer {
 			this.beginStateChangeBatch();
 			this.setMode("practice");
 			this.setGameState(null);
-			this.globalTimer.setTimeRemaining(this.settings.practiceTime * milliseconds);
+			this.globalTimer.setTimeRemaining(this.getTimerDuration("practice"));
 			this.globalTimer.start();
 		} finally {
 			this.endStateChangeBatch();
@@ -726,7 +780,7 @@ export class CurlingTimer {
 			this.beginStateChangeBatch();
 			this.setMode("warmup");
 			this.setGameState(null);
-			this.globalTimer.setTimeRemaining(this.settings.warmupTime * milliseconds);
+			this.globalTimer.setTimeRemaining(this.getTimerDuration("warmup"));
 			this.globalTimer.start();
 		} finally {
 			this.endStateChangeBatch();
@@ -741,7 +795,7 @@ export class CurlingTimer {
 			this.beginStateChangeBatch();
 			this.setMode("lsfe");
 			this.setGameState(null);
-			this.globalTimer.setTimeRemaining(this.settings.lsfeTime * milliseconds);
+			this.globalTimer.setTimeRemaining(this.getTimerDuration("lsfe"));
 			this.globalTimer.start();
 		} finally {
 			this.endStateChangeBatch();
@@ -971,12 +1025,13 @@ export class CurlingTimer {
 				this.stopThinking();
 				this.setGameState(isMidgameBreak ? "midgame-break" : "between-ends");
 				this.hammerTeam = null;
-				const breakTime =
-					(isMidgameBreak ? this.settings.midgameBreakTime : this.settings.betweenEndTime) * milliseconds;
+				const breakTime = isMidgameBreak
+					? this.getTimerDuration("midgame-break")
+					: this.getTimerDuration("between-ends");
 				this.globalTimer.setTimeRemaining(breakTime);
 				this.globalTimer.registerCompleteCallback(() => {
 					this.setGameState("prep");
-					this.globalTimer.setTimeRemaining(this.settings.prepTime * milliseconds);
+					this.globalTimer.setTimeRemaining(this.getTimerDuration("prep"));
 					this.globalTimer.registerCompleteCallback(() => {
 						this.advanceEnd();
 					}, true);
@@ -1153,7 +1208,9 @@ export class CurlingTimer {
 				const autoSide = this.end % 2 === 0 ? "home" : "away";
 				const defaultedSide = side ?? autoSide;
 				const travelTime =
-					defaultedSide === "home" ? this.settings.homeTravelTime : this.settings.awayTravelTime;
+					defaultedSide === "home"
+						? this.getTimerDuration("home-travel")
+						: this.getTimerDuration("away-travel");
 				if (team === 1) {
 					if (this.team1Timeouts < 1) {
 						return;
@@ -1168,13 +1225,13 @@ export class CurlingTimer {
 				this.setGameState(`${defaultedSide}-travel`);
 				this.team1Timer.pause();
 				this.team2Timer.pause();
-				this.globalTimer.setTimeRemaining(travelTime * milliseconds);
+				this.globalTimer.setTimeRemaining(travelTime);
 				this.teamTimedOut = team;
 				this.globalTimer.registerCompleteCallback(() => {
 					try {
 						this.beginStateChangeBatch();
 						this.setGameState("timeout");
-						this.globalTimer.setTimeRemaining(this.settings.timeoutTime * milliseconds);
+						this.globalTimer.setTimeRemaining(this.getTimerDuration("timeout"));
 						this.globalTimer.registerCompleteCallback(() => {
 							try {
 								this.beginStateChangeBatch();

@@ -454,6 +454,7 @@ test("thinking time is correct per-end", async () => {
 	config.betweenEndTime = 5;
 	config.prepTime = 5;
 	config.endCount = 6;
+	config.emulateWcfCurlTime = false;
 	config.timerSpeedMultiplier = 1000;
 	const blocks: ThinkingTimeBlock[] = [
 		{ startEnd: 1, endEnd: 2, thinkingTime: 240 },
