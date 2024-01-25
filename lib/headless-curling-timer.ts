@@ -197,11 +197,15 @@ export interface CurlingTimerState {
 
 	/**
 	 * The thinking time remaining, in milliseconds, for team 1.
+	 * If thinkingTimeBlocks is "track-only", this is the total elapsed
+	 * thinking time for team1 (rather than time remaining).
 	 */
 	team1Time: number;
 
 	/**
 	 * The thinking time remaining, in milliseconds, for team 2.
+	 * If thinkingTimeBlocks is "track-only", this is the total elapsed
+	 * thinking time for team1 (rather than time remaining).
 	 */
 	team2Time: number;
 
@@ -449,6 +453,8 @@ export function getBasicConfig(configName: BasicConfigNAme): BasicTimerSettings 
 	}
 	return JSON.parse(JSON.stringify(result));
 }
+
+const TRACK_TIME = Math.round(Number.MAX_SAFE_INTEGER / 10000) * 1000;
 
 export class BasicTimer {
 	private _timer: SuperCountdown;
@@ -815,7 +821,7 @@ export class CurlingTimer {
 			this.currentTeam1Stone = null;
 			this.hammerTeam = hammerTeam ?? null;
 			const thinkingTimeBlock = this.getCurrentThinkingTimeBlock();
-			const thinkingTime = thinkingTimeBlock ? thinkingTimeBlock.thinkingTime : 3600;
+			const thinkingTime = thinkingTimeBlock ? thinkingTimeBlock.thinkingTime : (TRACK_TIME / 1000);
 			this.team1Timer.setTimeRemaining(thinkingTime * milliseconds);
 			this.team2Timer.setTimeRemaining(thinkingTime * milliseconds);
 		} finally {
@@ -1369,8 +1375,18 @@ export class CurlingTimer {
 			mode: this.mode,
 			gameState: this.gameState,
 			end: this.end,
-			team1Time: this.mode === "game" ? this.team1Timer.getTimeRemaining() : 0,
-			team2Time: this.mode === "game" ? this.team2Timer.getTimeRemaining() : 0,
+			team1Time:
+				this.mode === "game"
+					? this.settings.thinkingTimeBlocks === "track-only"
+						? TRACK_TIME - this.team1Timer.getTimeRemaining()
+						: this.team1Timer.getTimeRemaining()
+					: 0,
+			team2Time:
+				this.mode === "game"
+					? this.settings.thinkingTimeBlocks === "track-only"
+						? TRACK_TIME - this.team2Timer.getTimeRemaining()
+						: this.team2Timer.getTimeRemaining()
+					: 0,
 			globalTime: this.globalTimer.getTimeRemaining(),
 			team1Timeouts: this.team1Timeouts,
 			team2Timeouts: this.team2Timeouts,
@@ -1407,8 +1423,12 @@ export class CurlingTimer {
 		timer.mode = state.mode;
 		timer.gameState = state.gameState;
 		timer.end = state.end;
-		timer.team1Timer.setTimeRemaining(state.team1Time);
-		timer.team2Timer.setTimeRemaining(state.team2Time);
+		timer.team1Timer.setTimeRemaining(
+			state.settings.thinkingTimeBlocks === "track-only" ? TRACK_TIME - state.team1Time : state.team1Time,
+		);
+		timer.team2Timer.setTimeRemaining(
+			state.settings.thinkingTimeBlocks === "track-only" ? TRACK_TIME - state.team2Time : state.team2Time,
+		);
 		timer.globalTimer.setTimeRemaining(state.globalTime);
 		timer.team1Timeouts = state.team1Timeouts;
 		timer.team2Timeouts = state.team2Timeouts;

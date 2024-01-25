@@ -704,3 +704,25 @@ test("Countdown complete callbacks", async () => {
 	expect(callback).toHaveBeenCalledTimes(4);
 	timer.stopThinking();
 });
+
+test("track-only thinking time", async () => {
+	const config = getStandardConfig("10end");
+	config.timerSpeedMultiplier = 1000;
+	config.thinkingTimeBlocks = "track-only";
+	const timer = new CurlingTimer(config);
+	timer.startGame();
+	expect(timer.getFullState().team1Time).toBe(0);
+	expect(timer.getFullState().team2Time).toBe(0);
+	timer.startThinking(1);
+	await Bun.sleep(10);
+	timer.stopThinking();
+	timer.startThinking(2);
+	await Bun.sleep(10);
+	timer.stopThinking();
+	expect(timer.getFullState().team1Time > 0).toBe(true);
+	expect(timer.getFullState().team2Time > 0).toBe(true);
+
+	const state = timer.getFullState();
+	const timer2 = CurlingTimer.unserialize(state);
+	expect(timer2.getFullState()).toEqual(state);
+});
