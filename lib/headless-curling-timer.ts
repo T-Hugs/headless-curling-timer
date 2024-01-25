@@ -1172,8 +1172,13 @@ export class CurlingTimer {
 					throw new Error("No such end");
 				}
 
-				this.team1Timer.setTimeRemaining(endToReplay.team1Time);
-				this.team2Timer.setTimeRemaining(endToReplay.team2Time);
+				if (this.settings.thinkingTimeBlocks === "track-only") {
+					this.team1Timer.setTimeRemaining(TRACK_TIME - endToReplay.team1Time);
+					this.team2Timer.setTimeRemaining(TRACK_TIME - endToReplay.team2Time);
+				} else {
+					this.team1Timer.setTimeRemaining(endToReplay.team1Time);
+					this.team2Timer.setTimeRemaining(endToReplay.team2Time);
+				}
 				this.globalTimer.setTimeRemaining(endToReplay.globalTime);
 				this.end = endToReplay.end;
 				this.team1Timeouts = endToReplay.team1Timeouts;
