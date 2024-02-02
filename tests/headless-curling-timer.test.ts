@@ -141,6 +141,14 @@ test("Basic timer subtract time ends timer", async () => {
 	expect(complete).toBe(true);
 });
 
+test("Basic timer disposal", () => {
+	const config = { totalTime: 100, timerSpeedMultiplier: 1000 };
+	const timer = new BasicTimer(config, () => {});
+	timer.start();
+	timer.dispose();
+	expect(() => timer.start()).toThrow();
+});
+
 test("Validate thinking time blocks: should not throw error for 'track-only' input", () => {
 	const config = getStandardConfig("10end");
 	config.thinkingTimeBlocks = "track-only";

@@ -458,6 +458,7 @@ const TRACK_TIME = Math.round(Number.MAX_SAFE_INTEGER / 10000) * 1000;
 
 export class BasicTimer {
 	private _timer: SuperCountdown;
+	private disposed: boolean = false;
 
 	constructor(settings: BasicTimerSettings, onCompletion: () => void) {
 		if (settings.timerSpeedMultiplier !== 1.0 && !isBunTestEnv()) {
@@ -486,6 +487,15 @@ export class BasicTimer {
 
 	public addTime(sec: number) {
 		this._timer.addTime(sec * milliseconds);
+	}
+
+	public dispose() {
+		this._timer.dispose();
+		this.disposed = true;
+	}
+
+	public isDisposed() {
+		return this.disposed;
 	}
 }
 
@@ -821,7 +831,7 @@ export class CurlingTimer {
 			this.currentTeam1Stone = null;
 			this.hammerTeam = hammerTeam ?? null;
 			const thinkingTimeBlock = this.getCurrentThinkingTimeBlock();
-			const thinkingTime = thinkingTimeBlock ? thinkingTimeBlock.thinkingTime : (TRACK_TIME / 1000);
+			const thinkingTime = thinkingTimeBlock ? thinkingTimeBlock.thinkingTime : TRACK_TIME / 1000;
 			this.team1Timer.setTimeRemaining(thinkingTime * milliseconds);
 			this.team2Timer.setTimeRemaining(thinkingTime * milliseconds);
 		} finally {
