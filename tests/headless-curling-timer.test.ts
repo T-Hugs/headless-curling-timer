@@ -428,6 +428,8 @@ test("setHammerTeam", () => {
 	expect(timer.getFullState().hammerTeam).toBe(2);
 	timer.setHammerTeam(1);
 	expect(timer.getFullState().hammerTeam).toBe(1);
+	timer.setHammerTeam(null);
+	expect(timer.getFullState().hammerTeam).toBe(null);
 });
 
 test("between ends", async () => {

@@ -1004,7 +1004,7 @@ export class CurlingTimer {
 	 * used in an end.
 	 * @param team
 	 */
-	public setHammerTeam(team: 1 | 2) {
+	public setHammerTeam(team: 1 | 2 | null) {
 		if (this.mode === "game" && this.hammerTeam !== team) {
 			try {
 				this.beginStateChangeBatch();
