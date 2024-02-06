@@ -92,7 +92,7 @@ export interface CurlingTimerSettings {
 	/**
 	 * Amount of time given to throw the LSD (last stone draw).
 	 */
-	lsfeTime: number;
+	lsdTime: number;
 
 	/**
 	 * End number after which the midgame break occurs.
@@ -169,7 +169,7 @@ export interface CurlingTimerState {
 	 * "idle": - Base state when no functions are being used.
 	 * "practice": Sanctioned practice time for an event.
 	 * "warmup": Pre-game warmup time.
-	 * "lsfe": Draw to the button for determination of hammer.
+	 * "lsd": Draw to the button for determination of hammer.
 	 * "game": Any part of the game play.
 	 */
 	mode: CurlingTimerMode;
@@ -349,7 +349,7 @@ const wcf10EndStandardSettings: CurlingTimerSettings = {
 	extraEndTime: 4 * 60 + 30,
 	extraEndTimeoutCount: 1,
 	homeTravelTime: 45,
-	lsfeTime: 60,
+	lsdTime: 60,
 	midgameBreakAfterEnd: 5,
 	midgameBreakTime: 5 * 60,
 	practiceTime: 30 * 60,
@@ -371,7 +371,7 @@ const wcf8EndStandardSettings: CurlingTimerSettings = {
 	extraEndTime: 4 * 60 + 30,
 	extraEndTimeoutCount: 1,
 	homeTravelTime: 45,
-	lsfeTime: 60,
+	lsdTime: 60,
 	midgameBreakAfterEnd: 4,
 	midgameBreakTime: 5 * 60,
 	practiceTime: 30 * 60,
@@ -393,7 +393,7 @@ const wcfMixedDoublesStandardSettings: CurlingTimerSettings = {
 	extraEndTime: 3 * 60,
 	extraEndTimeoutCount: 1,
 	homeTravelTime: 45,
-	lsfeTime: 60,
+	lsdTime: 60,
 	midgameBreakAfterEnd: 4,
 	midgameBreakTime: 5 * 60,
 	practiceTime: 30 * 60,
@@ -521,7 +521,7 @@ function validateThinkingTimeBlocks(blocks: ThinkingTimeBlock[] | "track-only", 
 	}
 }
 
-export type CurlingTimerMode = "idle" | "practice" | "warmup" | "lsfe" | "game";
+export type CurlingTimerMode = "idle" | "practice" | "warmup" | "lsd" | "game";
 export type CurlingTimerGameState =
 	| "thinking"
 	| "idle"
@@ -591,7 +591,7 @@ export class CurlingTimer {
 			| "between-ends"
 			| "extra-end"
 			| "home-travel"
-			| "lsfe"
+			| "lsd"
 			| "midgame-break"
 			| "practice"
 			| "prep"
@@ -608,8 +608,8 @@ export class CurlingTimer {
 				return this.settings.extraEndTime * milliseconds;
 			case "home-travel":
 				return this.settings.homeTravelTime * milliseconds + wcfComp;
-			case "lsfe":
-				return this.settings.lsfeTime * milliseconds;
+			case "lsd":
+				return this.settings.lsdTime * milliseconds;
 			case "midgame-break":
 				return this.settings.midgameBreakTime * milliseconds + wcfComp;
 			case "practice":
@@ -782,7 +782,6 @@ export class CurlingTimer {
 			this.setMode("practice");
 			this.setGameState(null);
 			this.globalTimer.setTimeRemaining(this.getTimerDuration("practice"));
-			this.globalTimer.start();
 		} finally {
 			this.endStateChangeBatch();
 		}
@@ -797,7 +796,6 @@ export class CurlingTimer {
 			this.setMode("warmup");
 			this.setGameState(null);
 			this.globalTimer.setTimeRemaining(this.getTimerDuration("warmup"));
-			this.globalTimer.start();
 		} finally {
 			this.endStateChangeBatch();
 		}
@@ -806,13 +804,12 @@ export class CurlingTimer {
 	/**
 	 * Starts the timer for the last stone draw.
 	 */
-	public startLSFE() {
+	public startLsd() {
 		try {
 			this.beginStateChangeBatch();
-			this.setMode("lsfe");
+			this.setMode("lsd");
 			this.setGameState(null);
-			this.globalTimer.setTimeRemaining(this.getTimerDuration("lsfe"));
-			this.globalTimer.start();
+			this.globalTimer.setTimeRemaining(this.getTimerDuration("lsd"));
 		} finally {
 			this.endStateChangeBatch();
 		}

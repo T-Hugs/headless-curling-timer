@@ -41,7 +41,7 @@ test("Get standard configuration", () => {
 		"extraEndTime",
 		"extraEndTimeoutCount",
 		"homeTravelTime",
-		"lsfeTime",
+		"lsdTime",
 		"midgameBreakAfterEnd",
 		"midgameBreakTime",
 		"practiceTime",
@@ -228,8 +228,8 @@ test("State changes", () => {
 	expect(timer.getFullState().mode).toBe("practice");
 	timer.startWarmup();
 	expect(timer.getFullState().mode).toBe("warmup");
-	timer.startLSFE();
-	expect(timer.getFullState().mode).toBe("lsfe");
+	timer.startLsd();
+	expect(timer.getFullState().mode).toBe("lsd");
 	timer.startGame();
 	expect(timer.getFullState().mode).toBe("game");
 });
@@ -239,6 +239,9 @@ test("Practice mode", async () => {
 	const timer = new CurlingTimer(config);
 	expect(timer.getFullState().globalTimerRunning).toBe(false);
 	timer.startPractice();
+	expect(timer.getFullState().globalTimerRunning).toBe(false);
+	expect(timer.getFullState().mode).toBe("practice");
+	timer.unpause();
 	expect(timer.getFullState().globalTimerRunning).toBe(true);
 });
 
@@ -247,14 +250,20 @@ test("Warmup mode", async () => {
 	const timer = new CurlingTimer(config);
 	expect(timer.getFullState().globalTimerRunning).toBe(false);
 	timer.startWarmup();
+	expect(timer.getFullState().globalTimerRunning).toBe(false);
+	expect(timer.getFullState().mode).toBe("warmup");
+	timer.unpause();
 	expect(timer.getFullState().globalTimerRunning).toBe(true);
 });
 
-test("LSFE mode", async () => {
+test("LSD mode", async () => {
 	const config = getStandardConfig("10end");
 	const timer = new CurlingTimer(config);
 	expect(timer.getFullState().globalTimerRunning).toBe(false);
-	timer.startLSFE();
+	timer.startLsd();
+	expect(timer.getFullState().globalTimerRunning).toBe(false);
+	expect(timer.getFullState().mode).toBe("lsd");
+	timer.unpause();
 	expect(timer.getFullState().globalTimerRunning).toBe(true);
 });
 
@@ -650,12 +659,12 @@ test("State change callbacks", async () => {
 	await Bun.sleep(0)
 	expect(callback).toHaveBeenCalledTimes(9);
 	timer.betweenEnds();
-	await Bun.sleep(16);
+	await Bun.sleep(20);
 	expect(callback).toHaveBeenCalledTimes(11);
 	await Bun.sleep(10);
 	expect(callback).toHaveBeenCalledTimes(12);
 	timer.startTimeout(2);
-	await Bun.sleep(11);
+	await Bun.sleep(15);
 	expect(callback).toHaveBeenCalledTimes(14);
 	await Bun.sleep(15);
 	expect(callback).toHaveBeenCalledTimes(15);
