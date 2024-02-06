@@ -824,6 +824,7 @@ export class CurlingTimer {
 			this.beginStateChangeBatch();
 			this.setMode("practice");
 			this.setGameState(null);
+			this.pause();
 			this.globalTimer.setTimeRemaining(this.getTimerDuration("practice"));
 		} finally {
 			this.endStateChangeBatch();
@@ -838,6 +839,7 @@ export class CurlingTimer {
 			this.beginStateChangeBatch();
 			this.setMode("warmup");
 			this.setGameState(null);
+			this.pause();
 			this.globalTimer.setTimeRemaining(this.getTimerDuration("warmup"));
 		} finally {
 			this.endStateChangeBatch();
@@ -852,6 +854,7 @@ export class CurlingTimer {
 			this.beginStateChangeBatch();
 			this.setMode("lsd");
 			this.setGameState(null);
+			this.pause();
 			this.globalTimer.setTimeRemaining(this.getTimerDuration("lsd"));
 		} finally {
 			this.endStateChangeBatch();
@@ -866,6 +869,7 @@ export class CurlingTimer {
 		try {
 			this.beginStateChangeBatch();
 			this.setMode("game");
+			this.pause();
 			this.end = 1;
 			this.currentTeam1Stone = null;
 			this.currentTeam1Stone = null;
