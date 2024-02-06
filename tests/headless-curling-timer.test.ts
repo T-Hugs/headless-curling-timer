@@ -745,3 +745,27 @@ test("track-only thinking time", async () => {
 	const timer2 = CurlingTimer.unserialize(state);
 	expect(timer2.getFullState()).toEqual(state);
 });
+
+test("Game has started", async () => {
+	const config = getStandardConfig("10end");
+	config.timerSpeedMultiplier = 1000;
+	const timer = new CurlingTimer(config);
+	expect(timer.getFullState().gameHasStarted).toBe(false);
+	timer.startPractice();
+	timer.startWarmup();
+	timer.startLsd();
+	timer.unpause();
+	await Bun.sleep(10);
+	timer.pause();
+	timer.startGame();
+	expect(timer.getFullState().gameHasStarted).toBe(false);
+	timer.startThinking(1);
+	await Bun.sleep(10);
+	timer.stopThinking();
+	expect(timer.getFullState().gameHasStarted).toBe(true);
+	timer.betweenEnds();
+	timer.endBetweenEnds(true);
+	expect(timer.getFullState().gameHasStarted).toBe(true);
+	timer.goToEnd(1);
+	expect(timer.getFullState().gameHasStarted).toBe(false);
+});

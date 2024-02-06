@@ -297,6 +297,16 @@ export interface CurlingTimerState {
 	 * A snapshot of the full game state taken at the conclusion of each end.
 	 */
 	endSnapshots: CurlingTimerState[] | undefined;
+
+	/**
+	 * Indicates whether the game has started. The game is not considered to have
+	 * started until a timer has been run. If timers are reset to initial values
+	 * (and the end and stones are all reset back to initial states), we will
+	 * also consider the game not to have started.
+	 * 
+	 * Practice, Warmup, and LSD periods are not considered to be part of the game.
+	 */
+	gameHasStarted: boolean;
 }
 
 export interface BasicTimerSettings {
@@ -666,6 +676,39 @@ export class CurlingTimer {
 				}
 			}
 		});
+	}
+
+	private gameHasStarted() {
+		if (this.mode !== "game") {
+			return false;
+		}
+		if (this.end === 0) {
+			return false;
+		}
+		if (this.end > 1) {
+			return true;
+		}
+		if (this.currentTeam1Stone !== null || this.currentTeam2Stone !== null) {
+			return true;
+		}
+		const thinkingTimeBlock = this.getCurrentThinkingTimeBlock();
+		const thinkingTime = thinkingTimeBlock ? thinkingTimeBlock.thinkingTime : TRACK_TIME / 1000;
+		if (this.getThinkingTime(1) !== thinkingTime * milliseconds) {
+			return true;
+		}
+		if (this.getThinkingTime(2) !== thinkingTime * milliseconds) {
+			return true;
+		}
+		return false;
+	}
+
+	private getThinkingTime(team: 1 | 2) {
+		const timer = team === 1 ? this.team1Timer : this.team2Timer;
+		return this.mode === "game"
+			? this.settings.thinkingTimeBlocks === "track-only"
+				? TRACK_TIME - timer.getTimeRemaining()
+				: timer.getTimeRemaining()
+			: 0;
 	}
 
 	private getCurrentThinkingTimeBlock() {
@@ -1387,18 +1430,8 @@ export class CurlingTimer {
 			mode: this.mode,
 			gameState: this.gameState,
 			end: this.end,
-			team1Time:
-				this.mode === "game"
-					? this.settings.thinkingTimeBlocks === "track-only"
-						? TRACK_TIME - this.team1Timer.getTimeRemaining()
-						: this.team1Timer.getTimeRemaining()
-					: 0,
-			team2Time:
-				this.mode === "game"
-					? this.settings.thinkingTimeBlocks === "track-only"
-						? TRACK_TIME - this.team2Timer.getTimeRemaining()
-						: this.team2Timer.getTimeRemaining()
-					: 0,
+			team1Time: this.getThinkingTime(1),
+			team2Time: this.getThinkingTime(2),
 			globalTime: this.globalTimer.getTimeRemaining(),
 			team1Timeouts: this.team1Timeouts,
 			team2Timeouts: this.team2Timeouts,
@@ -1413,6 +1446,7 @@ export class CurlingTimer {
 			hammerTeam: this.hammerTeam,
 			settings: this.settings,
 			endSnapshots: includeEndSnapshots ? this.endSnapshots : undefined,
+			gameHasStarted: this.gameHasStarted(),
 		};
 	}
 
