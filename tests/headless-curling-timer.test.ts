@@ -769,3 +769,37 @@ test("Game has started", async () => {
 	timer.goToEnd(1);
 	expect(timer.getFullState().gameHasStarted).toBe(false);
 });
+
+test("Shot clock times", async () => {
+	const config = getStandardConfig("10end");
+	const timer = new CurlingTimer(config);
+	timer.startGame();
+	expect(timer.getFullState().team1ShotClockTime).toBe(0);
+	expect(timer.getFullState().team2ShotClockTime).toBe(0);
+	timer.startThinking(1);
+	await Bun.sleep(10);
+	timer.stopThinking();
+	expect(timer.getFullState().team1ShotClockTime > 9).toBe(true);
+	expect(timer.getFullState().team1ShotClockTime < 12).toBe(true);
+	expect(timer.getFullState().team2ShotClockTime).toBe(0);
+	timer.startThinking(1);
+	await Bun.sleep(10);
+	timer.stopThinking();
+	expect(timer.getFullState().team1ShotClockTime > 18).toBe(true);
+	expect(timer.getFullState().team1ShotClockTime < 24).toBe(true);
+	expect(timer.getFullState().team2ShotClockTime).toBe(0);
+	timer.startThinking(2);
+	await Bun.sleep(10);
+	timer.stopThinking();
+	expect(timer.getFullState().team1ShotClockTime > 18).toBe(true);
+	expect(timer.getFullState().team1ShotClockTime < 24).toBe(true);
+	expect(timer.getFullState().team2ShotClockTime > 9).toBe(true);
+	expect(timer.getFullState().team2ShotClockTime < 12).toBe(true);
+	timer.startThinking(1);
+	await Bun.sleep(10);
+	timer.stopThinking();
+	expect(timer.getFullState().team1ShotClockTime > 9).toBe(true);
+	expect(timer.getFullState().team1ShotClockTime < 12).toBe(true);
+	expect(timer.getFullState().team2ShotClockTime > 9).toBe(true);
+	expect(timer.getFullState().team2ShotClockTime < 12).toBe(true);
+});
