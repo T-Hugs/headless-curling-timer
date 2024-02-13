@@ -559,8 +559,13 @@ test("Timeouts basic", async () => {
 	config.timerSpeedMultiplier = 1000;
 	const timer = new CurlingTimer(config);
 	timer.startGame();
+	timer.startThinking(1);
 	expect(timer.getFullState().team1Timeouts).toBe(1);
+	expect(timer.getFullState().teamThinking).toBe(1);
+	expect(timer.getFullState().team1TimerRunning).toBe(true);
 	timer.startTimeout(1);
+	expect(timer.getFullState().teamThinking).toBe(null);
+	expect(timer.getFullState().team1TimerRunning).toBe(false);
 	expect(timer.getFullState().team1Timeouts).toBe(0);
 	expect(timer.getFullState().teamTimedOut).toBe(1);
 	expect(timer.getFullState().gameState).toBe("away-travel");

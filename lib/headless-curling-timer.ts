@@ -1359,6 +1359,7 @@ export class CurlingTimer {
 					this.team2Timeouts--;
 				}
 				this.setGameState(`${defaultedSide}-travel`);
+				this.teamThinking = null;
 				this.team1Timer.pause();
 				this.team2Timer.pause();
 				this.globalTimer.setTimeRemaining(travelTime);
