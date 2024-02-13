@@ -321,6 +321,15 @@ export interface CurlingTimerState {
 	 * consumed time is counted in the shot clock.
 	 */
 	team2ShotClockTime: number;
+
+	/**
+	 * Indicates whether the game is paused. When the game is paused, the only next
+	 * legal action is to unpause the game. Just because timers are not running
+	 * does not mean the game is paused.
+	 *
+	 * The game can only enter a paused state if a timer is currently running.
+	 */
+	paused: boolean;
 }
 
 export interface BasicTimerSettings {
@@ -581,6 +590,7 @@ export class CurlingTimer {
 	private team1LastTurnTime: number = 0;
 	private team2LastTurnTime: number = 0;
 	private lastTeamThinking: 1 | 2 | null = null;
+	private paused: boolean = false;
 
 	constructor(settings: CurlingTimerSettings) {
 		const _settings = structuredClone(settings);
@@ -778,6 +788,7 @@ export class CurlingTimer {
 	}
 
 	private setMode(mode: CurlingTimerMode) {
+		this.paused = false;
 		if (this.mode === mode) {
 			return;
 		}
@@ -792,12 +803,19 @@ export class CurlingTimer {
 	}
 
 	private setGameState(gameState: CurlingTimerGameState | null) {
+		this.paused = false;
 		if (this.mode !== "game" || gameState === null || this.gameState === gameState) {
 			return;
 		}
 
 		this.gameState = gameState;
 		this.triggerStateChange();
+	}
+
+	private pauseAllTimers() {
+		this.team1Timer.pause();
+		this.team2Timer.pause();
+		this.globalTimer.pause();
 	}
 
 	public get timers() {
@@ -841,7 +859,7 @@ export class CurlingTimer {
 			this.beginStateChangeBatch();
 			this.setMode("practice");
 			this.setGameState(null);
-			this.pause();
+			this.pauseAllTimers();
 			this.globalTimer.setTimeRemaining(this.getTimerDuration("practice"));
 		} finally {
 			this.endStateChangeBatch();
@@ -856,7 +874,7 @@ export class CurlingTimer {
 			this.beginStateChangeBatch();
 			this.setMode("warmup");
 			this.setGameState(null);
-			this.pause();
+			this.pauseAllTimers();
 			this.globalTimer.setTimeRemaining(this.getTimerDuration("warmup"));
 		} finally {
 			this.endStateChangeBatch();
@@ -871,7 +889,7 @@ export class CurlingTimer {
 			this.beginStateChangeBatch();
 			this.setMode("lsd");
 			this.setGameState(null);
-			this.pause();
+			this.pauseAllTimers();
 			this.globalTimer.setTimeRemaining(this.getTimerDuration("lsd"));
 		} finally {
 			this.endStateChangeBatch();
@@ -886,7 +904,7 @@ export class CurlingTimer {
 		try {
 			this.beginStateChangeBatch();
 			this.setMode("game");
-			this.pause();
+			this.pauseAllTimers();
 			this.end = 1;
 			this.currentTeam1Stone = null;
 			this.currentTeam1Stone = null;
@@ -908,18 +926,25 @@ export class CurlingTimer {
 	 * will resume the same timer.
 	 */
 	public pause() {
+		if (
+			this.globalTimer.getState().isPaused &&
+			this.team1Timer.getState().isPaused &&
+			this.team2Timer.getState().isPaused
+		) {
+			return;
+		}
 		try {
 			this.beginStateChangeBatch();
-			this.team1Timer.pause();
-			this.team2Timer.pause();
-			this.globalTimer.pause();
+			this.pauseAllTimers();
+			this.paused = true;
 		} finally {
 			this.endStateChangeBatch();
 		}
 	}
 
 	/**
-	 * Unpauses whatever timer is relevant to the current game state.
+	 * Unpauses whatever timer is relevant to the current game state. Game
+	 * must currently be paused.
 	 */
 	public unpause() {
 		const timer = this.getTimer();
@@ -931,6 +956,7 @@ export class CurlingTimer {
 				this.endStateChangeBatch();
 			}
 		}
+		this.paused = false;
 	}
 
 	/**
@@ -940,6 +966,9 @@ export class CurlingTimer {
 	 * @param team
 	 */
 	public startThinking(team: 1 | 2) {
+		if (this.paused) {
+			return;
+		}
 		if (this.mode === "game") {
 			try {
 				this.beginStateChangeBatch();
@@ -1015,14 +1044,16 @@ export class CurlingTimer {
 	 * being a no-op.
 	 */
 	public stopThinking(): boolean {
+		if (this.paused) {
+			return false;
+		}
 		if (this.mode === "game") {
 			try {
 				this.beginStateChangeBatch();
 				const returnVal = this.gameState === "thinking";
 				this.setGameState("idle");
 				this.teamThinking = null;
-				this.team1Timer.pause();
-				this.team2Timer.pause();
+				this.pauseAllTimers();
 				return returnVal;
 			} finally {
 				this.endStateChangeBatch();
@@ -1107,7 +1138,7 @@ export class CurlingTimer {
 	}
 
 	private _betweenEnds(isMidgameBreak: boolean) {
-		if (this.mode === "game") {
+		if (this.mode === "game" && !this.paused) {
 			try {
 				this.beginStateChangeBatch();
 				this.stopThinking();
@@ -1149,6 +1180,9 @@ export class CurlingTimer {
 	}
 
 	private _endBetweenEnds(isMidgameBreak: boolean, advanceEnd = true) {
+		if (this.paused) {
+			return;
+		}
 		try {
 			this.beginStateChangeBatch();
 			const relevantGameState = isMidgameBreak ? "midgame-break" : "between-ends";
@@ -1198,6 +1232,9 @@ export class CurlingTimer {
 	 *   - Set stone count to null
 	 */
 	public advanceEnd() {
+		if (this.paused) {
+			return;
+		}
 		try {
 			this.beginStateChangeBatch();
 			this.endSnapshots.push(this.serialize());
@@ -1243,6 +1280,9 @@ export class CurlingTimer {
 	 * @param version
 	 */
 	public goToEnd(endNumber: number, conclusion = false, version: number = 1) {
+		if (this.paused) {
+			return;
+		}
 		try {
 			this.beginStateChangeBatch();
 			if (endNumber === 1 && !conclusion) {
@@ -1295,6 +1335,9 @@ export class CurlingTimer {
 	 * @param side
 	 */
 	public startTimeout(team: 1 | 2, side?: "home" | "away") {
+		if (this.paused) {
+			return;
+		}
 		if (this.mode === "game") {
 			try {
 				this.beginStateChangeBatch();
@@ -1353,6 +1396,9 @@ export class CurlingTimer {
 	 * a no-op.
 	 */
 	public endTravelTime(): boolean {
+		if (this.paused) {
+			return false;
+		}
 		if (this.gameState === "home-travel" || this.gameState === "away-travel") {
 			try {
 				this.beginStateChangeBatch();
@@ -1370,6 +1416,9 @@ export class CurlingTimer {
 	 * @param replenishTimeout
 	 */
 	public endTimeout(replenishTimeout = false) {
+		if (this.paused) {
+			return;
+		}
 		try {
 			this.beginStateChangeBatch();
 			const teamTimedOut = this.teamTimedOut;
@@ -1484,6 +1533,7 @@ export class CurlingTimer {
 			gameHasStarted: this.gameHasStarted(),
 			team1ShotClockTime: this.team1LastTurnTime - team1Time,
 			team2ShotClockTime: this.team2LastTurnTime - team2Time,
+			paused: this.paused,
 		};
 	}
 
@@ -1523,6 +1573,7 @@ export class CurlingTimer {
 		timer.hammerTeam = state.hammerTeam;
 		timer.team1LastTurnTime = state.team1Time + state.team1ShotClockTime;
 		timer.team2LastTurnTime = state.team2Time + state.team2ShotClockTime;
+		timer.paused = state.paused;
 		return timer;
 	}
 }
