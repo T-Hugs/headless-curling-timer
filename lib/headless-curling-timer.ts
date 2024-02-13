@@ -660,26 +660,6 @@ export class CurlingTimer {
 		}
 	}
 
-	private beginStateChangeBatch() {
-		this.stateChangeBatchDepth++;
-		if (this.batchedStateChangeCount === 0) {
-			this.batchedStateChangeCount = 1;
-		}
-	}
-
-	private endStateChangeBatch() {
-		this.stateChangeBatchDepth--;
-		if (this.stateChangeBatchDepth <= 0) {
-			if (this.batchedStateChangeCount > 0) {
-				this.fireEventListeners("statechange");
-			}
-			this.batchedStateChangeCount = 0;
-		}
-		if (this.stateChangeBatchDepth < 0) {
-			this.stateChangeBatchDepth = 0;
-		}
-	}
-
 	private countdownComplete() {
 		this.fireEventListeners("countdowncomplete");
 	}
@@ -820,6 +800,36 @@ export class CurlingTimer {
 
 	public get timers() {
 		return { team1Timer: this.team1Timer, team2Timer: this.team2Timer, globalTimer: this.globalTimer };
+	}
+
+	/**
+	 * Suppress all state changes until endStateChangeBatch() is called. Can be nested, 
+	 * but must be balanced with endStateChangeBatch() calls.
+	 * DANGER: do not forget to call endStateChangeBatch(), or you will lose
+	 * state change notifications.
+	 */
+	public beginStateChangeBatch() {
+		this.stateChangeBatchDepth++;
+		if (this.batchedStateChangeCount === 0) {
+			this.batchedStateChangeCount = 1;
+		}
+	}
+
+	/**
+	 * End a batch of state changes. If this is the last batch, and there were
+	 * state changes, then the "statechange" event will be fired.
+	 */
+	public endStateChangeBatch() {
+		this.stateChangeBatchDepth--;
+		if (this.stateChangeBatchDepth <= 0) {
+			if (this.batchedStateChangeCount > 0) {
+				this.fireEventListeners("statechange");
+			}
+			this.batchedStateChangeCount = 0;
+		}
+		if (this.stateChangeBatchDepth < 0) {
+			this.stateChangeBatchDepth = 0;
+		}
 	}
 
 	/**
