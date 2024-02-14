@@ -589,7 +589,6 @@ export class CurlingTimer {
 	private endSnapshots: CurlingTimerState[] = [];
 	private team1LastTurnTime: number = 0;
 	private team2LastTurnTime: number = 0;
-	private lastTeamThinking: 1 | 2 | null = null;
 	private paused: boolean = false;
 
 	constructor(settings: CurlingTimerSettings) {
@@ -984,8 +983,7 @@ export class CurlingTimer {
 				this.beginStateChangeBatch();
 				this.setGameState("thinking");
 				this.teamThinking = team;
-				if (team !== this.lastTeamThinking) {
-					this.lastTeamThinking = team;
+				if (team !== this.lastThinkingTeam) {
 					if (team === 1) {
 						this.team1LastTurnTime = this.getThinkingTime(1);
 					}
@@ -1030,6 +1028,7 @@ export class CurlingTimer {
 						this.currentTeam2Stone++;
 					}
 				}
+				this.lastThinkingTeam = team;
 				this.currentTeam1Stone =
 					this.currentTeam1Stone === null
 						? null
@@ -1208,9 +1207,11 @@ export class CurlingTimer {
 			}
 			if (stonePlayed && advanceEnd) {
 				if (stonePlayed === 1) {
+					this.lastThinkingTeam = 1;
 					this.hammerTeam = 2;
 					this.currentTeam1Stone = 1;
 				} else {
+					this.lastThinkingTeam = 2;
 					this.hammerTeam = 1;
 					this.currentTeam2Stone = 1;
 				}
