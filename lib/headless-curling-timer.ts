@@ -1189,7 +1189,7 @@ export class CurlingTimer {
 		this._betweenEnds(true);
 	}
 
-	private _endBetweenEnds(isMidgameBreak: boolean, advanceEnd = true) {
+	private _endBetweenEnds(isMidgameBreak: boolean, advanceEnd = true, stonePlayed?: 1 | 2) {
 		if (this.paused) {
 			return;
 		}
@@ -1206,6 +1206,15 @@ export class CurlingTimer {
 				this.goToEnd(this.end - 1, true);
 				this.endSnapshots.pop();
 			}
+			if (stonePlayed && advanceEnd) {
+				if (stonePlayed === 1) {
+					this.hammerTeam = 2;
+					this.currentTeam1Stone = 1;
+				} else {
+					this.hammerTeam = 1;
+					this.currentTeam2Stone = 1;
+				}
+			}
 		} finally {
 			this.endStateChangeBatch();
 		}
@@ -1216,11 +1225,16 @@ export class CurlingTimer {
 	 *
 	 * By default, advance the end count. If this break is canceled (e.g. because an input error),
 	 * caller may pass false to prevent the end count from advancing.
+	 * 
+	 * If a team number is passed for stone played (and advanceEnd is true), set the hammer to the 
+	 * opposite team (the team without hammer would have been the first to throw in the next end) 
+	 * and update stone counts accordingly.
 	 *
 	 * @param advanceEnd
+	 * @param stonePlayed
 	 */
-	public endBetweenEnds(advanceEnd = true) {
-		this._endBetweenEnds(false, advanceEnd);
+	public endBetweenEnds(advanceEnd = true, stonePlayed?: 1 | 2) {
+		this._endBetweenEnds(false, advanceEnd, stonePlayed);
 	}
 
 	/**
@@ -1229,11 +1243,16 @@ export class CurlingTimer {
 	 *
 	 * By default, advance the end count. If this break is canceled (e.g. because an input error),
 	 * caller may pass false to prevent the end count from advancing.
+	 * 
+	 * If a team number is passed for stone played (and advanceEnd is true), set the hammer to the 
+	 * opposite team (the team without hammer would have been the first to throw in the next end) 
+	 * and update stone counts accordingly.
 	 *
 	 * @param advanceEnd
+	 * @param stonePlayed
 	 */
-	public endMidgameBreak(advanceEnd = true) {
-		this._endBetweenEnds(true, advanceEnd);
+	public endMidgameBreak(advanceEnd = true, stonePlayed?: 1 | 2) {
+		this._endBetweenEnds(true, advanceEnd, stonePlayed);
 	}
 
 	/**

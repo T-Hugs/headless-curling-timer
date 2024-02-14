@@ -466,6 +466,18 @@ test("between ends", async () => {
 	timer.betweenEnds();
 	timer.endBetweenEnds(false);
 	expect(timer.getFullState().end).toBe(3);
+	timer.betweenEnds();
+	timer.endBetweenEnds(true, 1);
+	expect(timer.getFullState().end).toBe(4);
+	expect(timer.getFullState().hammerTeam).toBe(2);
+	expect(timer.getFullState().currentTeam1Stone).toBe(1);
+	expect(timer.getFullState().currentTeam2Stone).toBe(null);
+	timer.betweenEnds();
+	timer.endBetweenEnds(true, 2);
+	expect(timer.getFullState().end).toBe(5);
+	expect(timer.getFullState().hammerTeam).toBe(1);
+	expect(timer.getFullState().currentTeam1Stone).toBe(null);
+	expect(timer.getFullState().currentTeam2Stone).toBe(1);
 });
 
 test("thinking time is correct per-end", async () => {
