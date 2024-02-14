@@ -1337,7 +1337,7 @@ export class CurlingTimer {
 				this.team2Timeouts = endToReplay.team2Timeouts;
 				this.gameState = "idle";
 				this.hammerTeam = endToReplay.hammerTeam;
-				this.lastThinkingTeam = null;
+				this.lastThinkingTeam = conclusion ? endToReplay.lastThinkingTeam : null;
 				this.currentTeam1Stone = conclusion ? endToReplay.currentTeam1Stone : null;
 				this.currentTeam2Stone = conclusion ? endToReplay.currentTeam2Stone : null;
 				this.teamThinking = null;
