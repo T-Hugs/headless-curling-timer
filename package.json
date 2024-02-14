@@ -1,6 +1,6 @@
 {
   "name": "@trevorsg/headless-curling-timer",
-  "version": "1.6.5",
+  "version": "1.6.6",
   "description": "A headless timing library for curling games.",
   "directories": {
     "doc": "docs"

@@ -802,7 +802,7 @@ export class CurlingTimer {
 	}
 
 	/**
-	 * Suppress all state changes until endStateChangeBatch() is called. Can be nested, 
+	 * Suppress all state changes until endStateChangeBatch() is called. Can be nested,
 	 * but must be balanced with endStateChangeBatch() calls.
 	 * DANGER: do not forget to call endStateChangeBatch(), or you will lose
 	 * state change notifications.
@@ -1226,9 +1226,9 @@ export class CurlingTimer {
 	 *
 	 * By default, advance the end count. If this break is canceled (e.g. because an input error),
 	 * caller may pass false to prevent the end count from advancing.
-	 * 
-	 * If a team number is passed for stone played (and advanceEnd is true), set the hammer to the 
-	 * opposite team (the team without hammer would have been the first to throw in the next end) 
+	 *
+	 * If a team number is passed for stone played (and advanceEnd is true), set the hammer to the
+	 * opposite team (the team without hammer would have been the first to throw in the next end)
 	 * and update stone counts accordingly.
 	 *
 	 * @param advanceEnd
@@ -1244,9 +1244,9 @@ export class CurlingTimer {
 	 *
 	 * By default, advance the end count. If this break is canceled (e.g. because an input error),
 	 * caller may pass false to prevent the end count from advancing.
-	 * 
-	 * If a team number is passed for stone played (and advanceEnd is true), set the hammer to the 
-	 * opposite team (the team without hammer would have been the first to throw in the next end) 
+	 *
+	 * If a team number is passed for stone played (and advanceEnd is true), set the hammer to the
+	 * opposite team (the team without hammer would have been the first to throw in the next end)
 	 * and update stone counts accordingly.
 	 *
 	 * @param advanceEnd
@@ -1338,10 +1338,13 @@ export class CurlingTimer {
 				this.gameState = "idle";
 				this.hammerTeam = endToReplay.hammerTeam;
 				this.lastThinkingTeam = null;
-				this.currentTeam1Stone = conclusion ? this.settings.stonesPerEnd : null;
-				this.currentTeam2Stone = conclusion ? this.settings.stonesPerEnd : null;
+				this.currentTeam1Stone = conclusion ? endToReplay.currentTeam1Stone : null;
+				this.currentTeam2Stone = conclusion ? endToReplay.currentTeam2Stone : null;
 				this.teamThinking = null;
 				this.teamTimedOut = null;
+				this.paused = false;
+				this.team1LastTurnTime = endToReplay.team1Time + endToReplay.team1ShotClockTime;
+				this.team2LastTurnTime = endToReplay.team2Time + endToReplay.team2ShotClockTime;
 				this.batchedStateChangeCount = 0;
 			}
 		} finally {
@@ -1605,6 +1608,7 @@ export class CurlingTimer {
 		timer.team1LastTurnTime = state.team1Time + state.team1ShotClockTime;
 		timer.team2LastTurnTime = state.team2Time + state.team2ShotClockTime;
 		timer.paused = state.paused;
+		timer.endSnapshots = state.endSnapshots ?? [];
 		return timer;
 	}
 }
