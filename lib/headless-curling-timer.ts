@@ -1332,7 +1332,7 @@ export class CurlingTimer {
 					this.team2Timer.setTimeRemaining(endToReplay.team2Time);
 				}
 				this.globalTimer.setTimeRemaining(endToReplay.globalTime);
-				this.end = endToReplay.end;
+				this.end = conclusion ? endToReplay.end : endToReplay.end + 1;
 				this.team1Timeouts = endToReplay.team1Timeouts;
 				this.team2Timeouts = endToReplay.team2Timeouts;
 				this.gameState = "idle";
