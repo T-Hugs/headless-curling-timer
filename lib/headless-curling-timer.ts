@@ -330,6 +330,13 @@ export interface CurlingTimerState {
 	 * The game can only enter a paused state if a timer is currently running.
 	 */
 	paused: boolean;
+
+	/**
+	 * The Unix timestamp indicating when this state was created. This is used for
+	 * deserialization to interpolate used clock time for any timers that were running
+	 * when the serialized state was created.
+	 */
+	_date: number;
 }
 
 export interface BasicTimerSettings {
@@ -487,7 +494,7 @@ export function getBasicConfig(configName: BasicConfigNAme): BasicTimerSettings 
 	return JSON.parse(JSON.stringify(result));
 }
 
-const TRACK_TIME = Math.round(Number.MAX_SAFE_INTEGER / 10000) * 1000;
+const TRACK_TIME = Math.round(Number.MAX_SAFE_INTEGER / 100000000) * 1000;
 
 export class BasicTimer {
 	private _timer: SuperCountdown;
@@ -1277,7 +1284,10 @@ export class CurlingTimer {
 			this.currentTeam2Stone = null;
 			this.setGameState("idle");
 
-			if (currentThinkingTimeBlock === nextThinkingTimeBlock) {
+			if (
+				(currentThinkingTimeBlock === nextThinkingTimeBlock && nextThinkingTimeBlock !== null) ||
+				this.settings.thinkingTimeBlocks === "track-only"
+			) {
 				// The next end uses the same block of thinking time as the previous
 			} else if (nextThinkingTimeBlock === null) {
 				// The next end is an extra end
@@ -1543,6 +1553,9 @@ export class CurlingTimer {
 	public getFullState(includeEndSnapshots = false): CurlingTimerState {
 		const team1Time = this.getThinkingTime(1);
 		const team2Time = this.getThinkingTime(2);
+		const globalTime = this.globalTimer.getTimeRemaining();
+
+		const date = Date.now();
 
 		return {
 			mode: this.mode,
@@ -1550,7 +1563,7 @@ export class CurlingTimer {
 			end: this.end,
 			team1Time: team1Time,
 			team2Time: team2Time,
-			globalTime: this.globalTimer.getTimeRemaining(),
+			globalTime,
 			team1Timeouts: this.team1Timeouts,
 			team2Timeouts: this.team2Timeouts,
 			teamTimedOut: this.teamTimedOut,
@@ -1565,9 +1578,12 @@ export class CurlingTimer {
 			settings: this.settings,
 			endSnapshots: includeEndSnapshots ? this.endSnapshots : undefined,
 			gameHasStarted: this.gameHasStarted(),
-			team1ShotClockTime: this.team1LastTurnTime - team1Time,
-			team2ShotClockTime: this.team2LastTurnTime - team2Time,
+			team1ShotClockTime:
+				(this.team1LastTurnTime - team1Time) * (this.settings.thinkingTimeBlocks === "track-only" ? -1 : 1),
+			team2ShotClockTime:
+				(this.team2LastTurnTime - team2Time) * (this.settings.thinkingTimeBlocks === "track-only" ? -1 : 1),
 			paused: this.paused,
+			_date: date,
 		};
 	}
 
@@ -1585,18 +1601,26 @@ export class CurlingTimer {
 	 * @param state
 	 * @returns
 	 */
-	public static unserialize(state: CurlingTimerState): CurlingTimer {
+	public static unserialize(state: CurlingTimerState, interpolateTimeRemaining: boolean = true): CurlingTimer {
 		const timer = new CurlingTimer(state.settings);
+		const timeSinceSnapshot = interpolateTimeRemaining ? Date.now() - state._date : 0;
+		const lessTeam1Time = state.team1TimerRunning ? timeSinceSnapshot : 0;
+		const lessTeam2Time = state.team2TimerRunning ? timeSinceSnapshot : 0;
+		const lessGlobalTime = state.globalTimerRunning ? timeSinceSnapshot : 0;
 		timer.mode = state.mode;
 		timer.gameState = state.gameState;
 		timer.end = state.end;
 		timer.team1Timer.setTimeRemaining(
-			state.settings.thinkingTimeBlocks === "track-only" ? TRACK_TIME - state.team1Time : state.team1Time,
+			state.settings.thinkingTimeBlocks === "track-only"
+				? TRACK_TIME - state.team1Time - lessTeam1Time
+				: state.team1Time - lessTeam1Time,
 		);
 		timer.team2Timer.setTimeRemaining(
-			state.settings.thinkingTimeBlocks === "track-only" ? TRACK_TIME - state.team2Time : state.team2Time,
+			state.settings.thinkingTimeBlocks === "track-only"
+				? TRACK_TIME - state.team2Time - lessTeam2Time
+				: state.team2Time - lessTeam2Time,
 		);
-		timer.globalTimer.setTimeRemaining(state.globalTime);
+		timer.globalTimer.setTimeRemaining(state.globalTime - lessGlobalTime);
 		timer.team1Timeouts = state.team1Timeouts;
 		timer.team2Timeouts = state.team2Timeouts;
 		timer.teamTimedOut = state.teamTimedOut;
@@ -1605,10 +1629,21 @@ export class CurlingTimer {
 		timer.currentTeam2Stone = state.currentTeam2Stone;
 		timer.lastThinkingTeam = state.lastThinkingTeam;
 		timer.hammerTeam = state.hammerTeam;
-		timer.team1LastTurnTime = state.team1Time + state.team1ShotClockTime;
-		timer.team2LastTurnTime = state.team2Time + state.team2ShotClockTime;
+		timer.team1LastTurnTime =
+			state.team1Time + (state.settings.thinkingTimeBlocks === "track-only" ? -1 : 1) * state.team1ShotClockTime;
+		timer.team2LastTurnTime =
+			state.team2Time + (state.settings.thinkingTimeBlocks === "track-only" ? -1 : 1) * state.team2ShotClockTime;
 		timer.paused = state.paused;
 		timer.endSnapshots = state.endSnapshots ?? [];
+		if (state.globalTimerRunning) {
+			timer.globalTimer.start();
+		}
+		if (state.team1TimerRunning) {
+			timer.team1Timer.start();
+		}
+		if (state.team2TimerRunning) {
+			timer.team2Timer.start();
+		}
 		return timer;
 	}
 }

@@ -1,4 +1,4 @@
-import { expect, jest, mock, spyOn, test } from "bun:test";
+import { Expect, expect, jest, mock, spyOn, test } from "bun:test";
 import {
 	getBasicConfig,
 	getStandardConfig,
@@ -303,9 +303,56 @@ test("Serializable state", () => {
 test("Unserialize works.", () => {
 	const config = getStandardConfig("10end");
 	const timer = new CurlingTimer(config);
-	const state = timer.getFullState();
+	const state = timer.getFullState() as any;
 	const timer2 = CurlingTimer.unserialize(state);
-	expect(timer2.getFullState()).toEqual(state);
+	const timer2State = timer2.getFullState() as any;
+	delete state._date;
+	delete timer2State._date;
+	expect(timer2State).toEqual(state);
+});
+
+test("Unserialize with/without interpolation", async () => {
+	// With interpolation
+	const config = getStandardConfig("10end");
+	const timer = new CurlingTimer(config);
+	timer.startGame();
+	timer.startThinking(1);
+	await Bun.sleep(10);
+	const state = timer.getFullState() as any;
+	await Bun.sleep(10);
+	const timer2 = CurlingTimer.unserialize(state);
+	expect(timer2.getFullState().team1ShotClockTime).toBeGreaterThanOrEqual(20);
+	expect(timer2.getFullState().team1ShotClockTime).toBeLessThanOrEqual(23);
+	expect(timer2.getFullState().team1Time).toBeLessThanOrEqual(2279980);
+	expect(timer2.getFullState().team1Time).toBeGreaterThanOrEqual(2279977);
+	await Bun.sleep(10);
+	expect(timer2.getFullState().team1ShotClockTime).toBeGreaterThanOrEqual(30);
+	expect(timer2.getFullState().team1ShotClockTime).toBeLessThanOrEqual(35);
+	expect(timer2.getFullState().team1Time).toBeLessThanOrEqual(2279970);
+	expect(timer2.getFullState().team1Time).toBeGreaterThanOrEqual(2279967);
+	timer.stopThinking();
+	timer2.stopThinking();
+
+	// Without interpolation
+	const timer3 = new CurlingTimer(config);
+	timer3.startGame();
+	timer3.startThinking(1);
+	await Bun.sleep(10);
+	const state3 = timer3.getFullState() as any;
+	await Bun.sleep(10);
+	const timer4 = CurlingTimer.unserialize(state3, false);
+	expect(timer4.getFullState().team1ShotClockTime).toBeGreaterThanOrEqual(10);
+	expect(timer4.getFullState().team1ShotClockTime).toBeLessThanOrEqual(12);
+	expect(timer4.getFullState().team1Time).toBeLessThanOrEqual(2279990);
+	expect(timer4.getFullState().team1Time).toBeGreaterThanOrEqual(2279987);
+	await Bun.sleep(10);
+	expect(timer4.getFullState().team1ShotClockTime).toBeGreaterThanOrEqual(20);
+	expect(timer4.getFullState().team1ShotClockTime).toBeLessThanOrEqual(23);
+	expect(timer4.getFullState().team1Time).toBeLessThanOrEqual(2279980);
+	expect(timer4.getFullState().team1Time).toBeGreaterThanOrEqual(2279977);
+
+	timer3.stopThinking();
+	timer4.stopThinking();
 });
 
 test("Getting timer instances", () => {
@@ -752,7 +799,7 @@ test("track-only thinking time", async () => {
 	timer.startGame();
 	expect(timer.getFullState().team1Time).toBe(0);
 	expect(timer.getFullState().team2Time).toBe(0);
-	timer.startThinking(1);
+	timer.startThinking(1);	
 	await Bun.sleep(10);
 	timer.stopThinking();
 	timer.startThinking(2);
@@ -761,9 +808,12 @@ test("track-only thinking time", async () => {
 	expect(timer.getFullState().team1Time > 0).toBe(true);
 	expect(timer.getFullState().team2Time > 0).toBe(true);
 
-	const state = timer.getFullState();
+	const state = timer.getFullState() as any;
 	const timer2 = CurlingTimer.unserialize(state);
-	expect(timer2.getFullState()).toEqual(state);
+	const state2 = timer2.getFullState() as any;
+	delete state._date;
+	delete state2._date;
+	expect(state2).toEqual(state);
 });
 
 test("Game has started", async () => {
