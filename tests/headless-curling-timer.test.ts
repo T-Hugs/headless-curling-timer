@@ -149,6 +149,22 @@ test("Basic timer disposal", () => {
 	expect(() => timer.start()).toThrow();
 });
 
+test("Basic timer serialization/deserialization", async () => {
+	const config = { totalTime: 100 };
+	const timer = new BasicTimer(config, () => {});
+	const state = timer.serialize();
+	expect(() => JSON.stringify(state)).not.toThrow();
+	const timer2 = BasicTimer.unserialize(state, false);
+	const {_date, ...withNoDate} = state;
+	const timer2State = timer2.serialize() as any;
+	delete timer2State._date;
+	expect(withNoDate).toEqual(timer2State);
+	timer.start();
+	await Bun.sleep(10);
+	const timer3 = BasicTimer.unserialize(state, true);
+	expect(timer3.serialize().timeRemaining).toBeLessThanOrEqual(99990);
+});
+
 test("Validate thinking time blocks: should not throw error for 'track-only' input", () => {
 	const config = getStandardConfig("10end");
 	config.thinkingTimeBlocks = "track-only";
@@ -666,8 +682,6 @@ test("Timeouts basic", async () => {
 	timer.endTimeout(true);
 	expect(timer.getFullState().team1Timeouts).toBe(1);
 	expect(timer.getFullState().teamTimedOut).toBe(null);
-
-	
 });
 
 test("Add/set time", () => {
@@ -700,30 +714,30 @@ test("State change callbacks", async () => {
 	await Bun.sleep(0);
 	expect(callback).toHaveBeenCalledTimes(1);
 	timer.startThinking(1);
-	await Bun.sleep(0)
+	await Bun.sleep(0);
 	expect(callback).toHaveBeenCalledTimes(2);
 	timer.stopThinking();
-	await Bun.sleep(0)
+	await Bun.sleep(0);
 	expect(callback).toHaveBeenCalledTimes(3);
 	timer.startTimeout(1);
 	expect(timer.getFullState().gameState).toBe("away-travel");
-	await Bun.sleep(0)
+	await Bun.sleep(0);
 	expect(callback).toHaveBeenCalledTimes(4);
 	timer.endTimeout(); // travel + timeout = 1 state change
 	expect(timer.getFullState().gameState).toBe("idle");
-	await Bun.sleep(0)
+	await Bun.sleep(0);
 	expect(callback).toHaveBeenCalledTimes(5);
 	timer.betweenEnds();
-	await Bun.sleep(0)
+	await Bun.sleep(0);
 	expect(callback).toHaveBeenCalledTimes(6);
 	timer.endBetweenEnds(); // between ends + prep = 1 state change
-	await Bun.sleep(0)
+	await Bun.sleep(0);
 	expect(callback).toHaveBeenCalledTimes(7);
 	timer.midgameBreak();
-	await Bun.sleep(0)
+	await Bun.sleep(0);
 	expect(callback).toHaveBeenCalledTimes(8);
 	timer.endMidgameBreak(true);
-	await Bun.sleep(0)
+	await Bun.sleep(0);
 	expect(callback).toHaveBeenCalledTimes(9);
 	timer.betweenEnds();
 	await Bun.sleep(20);
@@ -799,7 +813,7 @@ test("track-only thinking time", async () => {
 	timer.startGame();
 	expect(timer.getFullState().team1Time).toBe(0);
 	expect(timer.getFullState().team2Time).toBe(0);
-	timer.startThinking(1);	
+	timer.startThinking(1);
 	await Bun.sleep(10);
 	timer.stopThinking();
 	timer.startThinking(2);

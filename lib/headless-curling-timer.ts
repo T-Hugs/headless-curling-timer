@@ -496,11 +496,37 @@ export function getBasicConfig(configName: BasicConfigNAme): BasicTimerSettings 
 
 const TRACK_TIME = Math.round(Number.MAX_SAFE_INTEGER / 100000000) * 1000;
 
+export interface BasicTimerState {
+	/**
+	 * The date at which this state was created. This is used to interpolate
+	 * the time remaining on the timer when deserializing.
+	 */
+	_date: number;
+
+	/**
+	 * Whether the timer is currently running.
+	 */
+	isRunning: boolean;
+
+	/**
+	 * The time remaining on the timer, in milliseconds.
+	 */
+	timeRemaining: number;
+
+	/**
+	 * The settings that were used to create this timer. This is a reference
+	 * to the same object that was passed into the Timer constructor.
+	 */
+	settings: BasicTimerSettings;
+}
+
 export class BasicTimer {
 	private _timer: SuperCountdown;
 	private disposed: boolean = false;
+	private settings: BasicTimerSettings;
 
 	constructor(settings: BasicTimerSettings, onCompletion: () => void) {
+		this.settings = settings;
 		if (settings.timerSpeedMultiplier !== 1.0 && !isBunTestEnv()) {
 			console.warn(
 				"WARNING: The setting `timerSpeedMultiplier` is set to " +
@@ -536,6 +562,28 @@ export class BasicTimer {
 
 	public isDisposed() {
 		return this.disposed;
+	}
+
+	public serialize(): BasicTimerState {
+		return {
+			_date: Date.now(),
+			isRunning: !this._timer.getState().isPaused,
+			timeRemaining: this._timer.getTimeRemaining(),
+			settings: this.settings,
+		};
+	}
+
+	public static unserialize(state: BasicTimerState, interpolateTimeRemaining: boolean = true): BasicTimer {
+		const timer = new BasicTimer(state.settings, () => {});
+		if (state.isRunning) {
+			timer.start();
+		}
+		const now = Date.now();
+		if (interpolateTimeRemaining) {
+			const timeElapsed = now - state._date;
+			timer.addTime(-timeElapsed / 1000);
+		}
+		return timer;
 	}
 }
 
