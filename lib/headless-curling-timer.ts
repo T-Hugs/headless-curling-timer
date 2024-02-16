@@ -579,7 +579,7 @@ export class BasicTimer {
 			timer.start();
 		}
 		const now = Date.now();
-		if (interpolateTimeRemaining) {
+		if (interpolateTimeRemaining && state.isRunning) {
 			const timeElapsed = now - state._date;
 			timer.addTime(-timeElapsed / 1000);
 		}
