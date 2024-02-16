@@ -1482,6 +1482,36 @@ export class CurlingTimer {
 	}
 
 	/**
+	 * Switches to the other travel time state and adjusts the global timer to
+	 * account for the change. For example, if home travel time is 60 seconds and
+	 * away travel time is 90 seconds, if you are 10 seconds into "home-travel" when
+	 * calling in this function, we add 30 seconds to the global timer, making it
+	 * 80 seconds.
+	 */
+	public swapTravelTime() {
+		if (this.gameState === "home-travel") {
+			try {
+				this.beginStateChangeBatch();
+				this.setGameState("away-travel");
+				const secondsToAdd = this.settings.awayTravelTime - this.settings.homeTravelTime;
+				this.addTime(secondsToAdd, "global");
+			} finally {
+				this.endStateChangeBatch();
+			}
+		} else if (this.gameState === "away-travel") {
+			try {
+				this.beginStateChangeBatch();
+				this.setGameState("home-travel");
+				const secondsToAdd = this.settings.homeTravelTime - this.settings.awayTravelTime;
+				this.addTime(secondsToAdd, "global");
+			} finally {
+				this.endStateChangeBatch();
+			}
+		}
+	
+	}
+
+	/**
 	 * Ends the travel time, which immediately begins the timeout time.
 	 *
 	 * @returns true if a travel time was stopped, false if it ended up being

@@ -160,8 +160,9 @@ test("Basic timer serialization/deserialization", async () => {
 	delete timer2State._date;
 	expect(withNoDate).toEqual(timer2State);
 	timer.start();
+	const state2 = timer.serialize();
 	await Bun.sleep(10);
-	const timer3 = BasicTimer.unserialize(state, true);
+	const timer3 = BasicTimer.unserialize(state2, true);
 	expect(timer3.serialize().timeRemaining).toBeLessThanOrEqual(99990);
 });
 
@@ -682,6 +683,30 @@ test("Timeouts basic", async () => {
 	timer.endTimeout(true);
 	expect(timer.getFullState().team1Timeouts).toBe(1);
 	expect(timer.getFullState().teamTimedOut).toBe(null);
+});
+
+test("Swap travel time", async () => {
+	const config = getStandardConfig("10end");
+	config.emulateWcfCurlTime = false;
+	config.timeoutTime = 30;
+	config.awayTravelTime = 20;
+	config.homeTravelTime = 10;
+	const timer = new CurlingTimer(config);
+	timer.startGame();
+	timer.startThinking(1);
+	timer.startTimeout(1); // away travel
+	expect(timer.getFullState().globalTime).toBeLessThanOrEqual(20000);
+	expect(timer.getFullState().globalTime).toBeGreaterThanOrEqual(19998);
+	await Bun.sleep(10);
+	expect(timer.getFullState().globalTime).toBeLessThanOrEqual(19990);
+	expect(timer.getFullState().globalTime).toBeGreaterThanOrEqual(19988);
+	timer.swapTravelTime();
+	expect(timer.getFullState().globalTime).toBeLessThanOrEqual(9990);
+	expect(timer.getFullState().globalTime).toBeGreaterThanOrEqual(9988);
+	await Bun.sleep(10);
+	timer.swapTravelTime();
+	expect(timer.getFullState().globalTime).toBeLessThanOrEqual(19980);
+	expect(timer.getFullState().globalTime).toBeGreaterThanOrEqual(19978);
 });
 
 test("Add/set time", () => {
