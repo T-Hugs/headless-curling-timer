@@ -574,7 +574,7 @@ export class BasicTimer {
 	}
 
 	public static unserialize(state: BasicTimerState, interpolateTimeRemaining: boolean = true): BasicTimer {
-		const timer = new BasicTimer({...state.settings, totalTime: state.timeRemaining}, () => {});
+		const timer = new BasicTimer({...state.settings, totalTime: state.timeRemaining / 1000}, () => {});
 		if (state.isRunning) {
 			timer.start();
 		}
