@@ -574,7 +574,7 @@ export class BasicTimer {
 	}
 
 	public static unserialize(state: BasicTimerState, interpolateTimeRemaining: boolean = true): BasicTimer {
-		const timer = new BasicTimer({...state.settings, totalTime: state.timeRemaining / 1000}, () => {});
+		const timer = new BasicTimer({ ...state.settings, totalTime: state.timeRemaining / 1000 }, () => {});
 		if (state.isRunning) {
 			timer.start();
 		}
@@ -1153,6 +1153,11 @@ export class CurlingTimer {
 					this.currentTeam1Stone = currentStone;
 					this.currentTeam2Stone = currentStone;
 				}
+				if (nextStoneNumber !== 1 || this.hammerTeam === team) {
+					this.lastThinkingTeam = team === 1 ? 2 : 1;
+				} else {
+					this.lastThinkingTeam = null;
+				}
 			} finally {
 				this.endStateChangeBatch();
 			}
@@ -1501,7 +1506,6 @@ export class CurlingTimer {
 				this.endStateChangeBatch();
 			}
 		}
-	
 	}
 
 	/**

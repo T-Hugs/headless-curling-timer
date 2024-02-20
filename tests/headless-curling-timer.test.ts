@@ -485,11 +485,13 @@ test("setNextStoneNumber logic", () => {
 	timer.startThinking(1);
 	timer.stopThinking();
 	timer.setNextStoneNumber(4, 1);
+	expect(timer.getFullState().lastThinkingTeam).toBe(2);
 	expect(timer.getFullState().currentTeam1Stone).toBe(3);
 	expect(timer.getFullState().currentTeam2Stone).toBe(3);
 	timer.startThinking(2);
 	timer.stopThinking();
 	timer.setNextStoneNumber(6, 2);
+	expect(timer.getFullState().lastThinkingTeam).toBe(1);
 	expect(timer.getFullState().currentTeam1Stone).toBe(6);
 	expect(timer.getFullState().currentTeam2Stone).toBe(5);
 });
