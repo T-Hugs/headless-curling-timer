@@ -1133,32 +1133,25 @@ export class CurlingTimer {
 	 * more than the number provided since they have already thrown for the end.
 	 * @param nextStoneNumber
 	 */
-	public setNextStoneNumber(nextStoneNumber: number) {
-		if (this.mode === "game") {
+	public setNextStoneNumber(nextStoneNumber: number, team: 1 | 2) {
+		if (this.mode === "game" && this.hammerTeam !== null) {
 			if (nextStoneNumber < 1 || nextStoneNumber > this.settings.stonesPerEnd) {
 				throw new Error("Invalid stone number");
 			}
 			try {
 				this.beginStateChangeBatch();
 				const currentStone = nextStoneNumber === 1 ? null : nextStoneNumber - 1;
-				this.currentTeam1Stone = currentStone;
-				this.currentTeam2Stone = currentStone;
-
-				// If non-hammer team has already thrown, advance their stone count
-				if (this.lastThinkingTeam !== this.hammerTeam) {
-					if (this.lastThinkingTeam === 1) {
-						if (this.currentTeam1Stone === null) {
-							this.currentTeam1Stone = 1;
-						} else {
-							this.currentTeam1Stone++;
-						}
-					} else if (this.lastThinkingTeam === 2) {
-						if (this.currentTeam2Stone === null) {
-							this.currentTeam2Stone = 1;
-						} else {
-							this.currentTeam2Stone++;
-						}
+				if (team === this.hammerTeam) {
+					if (team === 1) {
+						this.currentTeam1Stone = currentStone;
+						this.currentTeam2Stone = nextStoneNumber;
+					} else {
+						this.currentTeam1Stone = nextStoneNumber;
+						this.currentTeam2Stone = currentStone;
 					}
+				} else {
+					this.currentTeam1Stone = currentStone;
+					this.currentTeam2Stone = currentStone;
 				}
 			} finally {
 				this.endStateChangeBatch();

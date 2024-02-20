@@ -472,8 +472,9 @@ test("setNextStoneNumber error conditions", () => {
 	const config = getStandardConfig("10end");
 	const timer = new CurlingTimer(config);
 	timer.startGame();
-	expect(() => timer.setNextStoneNumber(0)).toThrow();
-	expect(() => timer.setNextStoneNumber(11)).toThrow();
+	timer.setHammerTeam(2);
+	expect(() => timer.setNextStoneNumber(0, 1)).toThrow();
+	expect(() => timer.setNextStoneNumber(11, 2)).toThrow();
 });
 
 test("setNextStoneNumber logic", () => {
@@ -483,14 +484,14 @@ test("setNextStoneNumber logic", () => {
 	timer.setHammerTeam(2);
 	timer.startThinking(1);
 	timer.stopThinking();
-	timer.setNextStoneNumber(4);
-	expect(timer.getFullState().currentTeam1Stone).toBe(4);
+	timer.setNextStoneNumber(4, 1);
+	expect(timer.getFullState().currentTeam1Stone).toBe(3);
 	expect(timer.getFullState().currentTeam2Stone).toBe(3);
 	timer.startThinking(2);
 	timer.stopThinking();
-	timer.setNextStoneNumber(6);
-	expect(timer.getFullState().currentTeam1Stone).toBe(5);
-	expect(timer.getFullState().currentTeam1Stone).toBe(5);
+	timer.setNextStoneNumber(6, 2);
+	expect(timer.getFullState().currentTeam1Stone).toBe(6);
+	expect(timer.getFullState().currentTeam2Stone).toBe(5);
 });
 
 test("setHammerTeam", () => {
