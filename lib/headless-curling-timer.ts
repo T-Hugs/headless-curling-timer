@@ -1101,6 +1101,35 @@ export class CurlingTimer {
 	}
 
 	/**
+	 * Start thinking, but automatically determine the team based on whichever team
+	 * was thinking most recently. This is a bit dangerous to use since it's possible
+	 * for a team's thinking time to start, stop, and start again.
+	 * 
+	 * If no team was the last thinking team (e.g. at the start of the end), nothing
+	 * will happen. If needed, call setNextThinkingTeam() before calling this function.
+	 */
+	public startThinkingAutoTeam() {
+		if (this.lastThinkingTeam === null) {
+			return;
+		}
+		this.startThinking(this.lastThinkingTeam === 1 ? 2 : 1);
+	}
+
+	/**
+	 * Set the next team to be thinking. This is used to set the team that will be
+	 * thinking after a timeout is called. This function does not start the thinking
+	 * time.
+	 * @param team
+	 */
+	public setNextThinkingTeam(team: 1 | 2 | null) {
+		if (team === null) {
+			this.lastThinkingTeam = null;
+		} else {
+			this.lastThinkingTeam = team === 1 ? 2 : 1;
+		}
+	}
+
+	/**
 	 * Stop the currently-running thinking time. This should be called as the
 	 * stone crosses the tee line at the delivery end.
 	 *

@@ -466,6 +466,31 @@ test("Start/stop thinking", async () => {
 	expect(timer.getFullState().team1Time).toBe(team1Time);
 	expect(timer.getFullState().team2Time < team2Time).toBe(true);
 	expect(timer.getFullState().teamThinking).toBe(2);
+	timer.stopThinking();
+
+	// Automatic team selection
+	timer.setNextThinkingTeam(null);
+	timer.startThinkingAutoTeam();
+	expect(timer.getFullState().teamThinking).toBeNull();
+	expect(timer.getFullState().team1TimerRunning).toBe(false);
+	expect(timer.getFullState().team2TimerRunning).toBe(false);
+	timer.setNextThinkingTeam(1);
+	timer.startThinkingAutoTeam();
+	expect(timer.getFullState().teamThinking).toBe(1);
+	expect(timer.getFullState().team1TimerRunning).toBe(true);
+	expect(timer.getFullState().team2TimerRunning).toBe(false);
+	timer.stopThinking();
+	timer.startThinkingAutoTeam();
+	expect(timer.getFullState().teamThinking).toBe(2);
+	expect(timer.getFullState().team1TimerRunning).toBe(false);
+	expect(timer.getFullState().team2TimerRunning).toBe(true);
+	timer.stopThinking();
+	timer.setNextThinkingTeam(2);
+	timer.startThinkingAutoTeam();
+	expect(timer.getFullState().teamThinking).toBe(2);
+	expect(timer.getFullState().team1TimerRunning).toBe(false);
+	expect(timer.getFullState().team2TimerRunning).toBe(true);
+	timer.stopThinking();
 });
 
 test("setNextStoneNumber error conditions", () => {
