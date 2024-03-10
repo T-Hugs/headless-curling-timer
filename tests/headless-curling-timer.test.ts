@@ -490,6 +490,10 @@ test("Start/stop thinking", async () => {
 	expect(timer.getFullState().teamThinking).toBe(2);
 	expect(timer.getFullState().team1TimerRunning).toBe(false);
 	expect(timer.getFullState().team2TimerRunning).toBe(true);
+	timer.startThinkingAutoTeam(); // should be a no-op
+	expect(timer.getFullState().teamThinking).toBe(2);
+	expect(timer.getFullState().team1TimerRunning).toBe(false);
+	expect(timer.getFullState().team2TimerRunning).toBe(true);
 	timer.stopThinking();
 });
 

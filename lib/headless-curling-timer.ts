@@ -1109,7 +1109,7 @@ export class CurlingTimer {
 	 * will happen. If needed, call setNextThinkingTeam() before calling this function.
 	 */
 	public startThinkingAutoTeam() {
-		if (this.lastThinkingTeam === null) {
+		if (this.lastThinkingTeam === null || this.teamThinking !== null) {
 			return;
 		}
 		this.startThinking(this.lastThinkingTeam === 1 ? 2 : 1);
