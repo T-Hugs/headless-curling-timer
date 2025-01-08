@@ -573,12 +573,12 @@ export class BasicTimer {
 		};
 	}
 
-	public static unserialize(state: BasicTimerState, interpolateTimeRemaining: boolean = true): BasicTimer {
+	public static unserialize(state: BasicTimerState, interpolateTimeRemaining: boolean | Date = true): BasicTimer {
 		const timer = new BasicTimer({ ...state.settings, totalTime: state.timeRemaining / 1000 }, () => {});
 		if (state.isRunning) {
 			timer.start();
 		}
-		const now = Date.now();
+		const now = typeof interpolateTimeRemaining === "object" ? interpolateTimeRemaining.getTime() : Date.now();
 		if (interpolateTimeRemaining && state.isRunning) {
 			const timeElapsed = now - state._date;
 			timer.addTime(-timeElapsed / 1000);
@@ -1104,7 +1104,7 @@ export class CurlingTimer {
 	 * Start thinking, but automatically determine the team based on whichever team
 	 * was thinking most recently. This is a bit dangerous to use since it's possible
 	 * for a team's thinking time to start, stop, and start again.
-	 * 
+	 *
 	 * If no team was the last thinking team (e.g. at the start of the end), nothing
 	 * will happen. If needed, call setNextThinkingTeam() before calling this function.
 	 */
@@ -1703,11 +1703,16 @@ export class CurlingTimer {
 	/**
 	 * Synthesize a CurlingTimer from a state object (e.g. from getFullState()).
 	 * @param state
+	 * @param interpolateTimeRemaining If a Date obj is given, interpolate time
+	 *   elapsed since the timer was serialized using the given Date as the basis
+	 *   for this calculation. If true, use the current system time. If false, do
+	 *   not interpolate.
 	 * @returns
 	 */
-	public static unserialize(state: CurlingTimerState, interpolateTimeRemaining: boolean = true): CurlingTimer {
+	public static unserialize(state: CurlingTimerState, interpolateTimeRemaining: boolean | Date = true): CurlingTimer {
 		const timer = new CurlingTimer(state.settings);
-		const timeSinceSnapshot = interpolateTimeRemaining ? Date.now() - state._date : 0;
+		const now = typeof interpolateTimeRemaining === "object" ? interpolateTimeRemaining.getTime() : Date.now();
+		const timeSinceSnapshot = interpolateTimeRemaining ? now - state._date : 0;
 		const lessTeam1Time = state.team1TimerRunning ? timeSinceSnapshot : 0;
 		const lessTeam2Time = state.team2TimerRunning ? timeSinceSnapshot : 0;
 		const lessGlobalTime = state.globalTimerRunning ? timeSinceSnapshot : 0;

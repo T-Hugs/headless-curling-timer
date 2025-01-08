@@ -164,6 +164,9 @@ test("Basic timer serialization/deserialization", async () => {
 	await Bun.sleep(10);
 	const timer3 = BasicTimer.unserialize(state2, true);
 	expect(timer3.serialize().timeRemaining).toBeLessThanOrEqual(99990);
+	timer3.pause();
+	const timer4 = BasicTimer.unserialize(state2, new Date(Date.now() + 10000));
+	expect(timer4.serialize().timeRemaining).toBeLessThanOrEqual(100000 - 10000);
 });
 
 test("Validate thinking time blocks: should not throw error for 'track-only' input", () => {
@@ -370,6 +373,25 @@ test("Unserialize with/without interpolation", async () => {
 
 	timer3.stopThinking();
 	timer4.stopThinking();
+
+	// With interpolation using a custom date
+	const timer5 = new CurlingTimer(config);
+	timer5.startGame();
+	timer5.startThinking(1);
+	await Bun.sleep(10);
+	const state2 = timer5.getFullState() as any;
+	const timer6 = CurlingTimer.unserialize(state2, new Date(Date.now() + 10000));
+	expect(timer6.getFullState().team1ShotClockTime).toBeGreaterThanOrEqual(10010);
+	expect(timer6.getFullState().team1ShotClockTime).toBeLessThanOrEqual(10013);
+	expect(timer6.getFullState().team1Time).toBeLessThanOrEqual(2269990);
+	expect(timer6.getFullState().team1Time).toBeGreaterThanOrEqual(2269987);
+	await Bun.sleep(10);
+	expect(timer6.getFullState().team1ShotClockTime).toBeGreaterThanOrEqual(10020);
+	expect(timer6.getFullState().team1ShotClockTime).toBeLessThanOrEqual(10023);
+	expect(timer6.getFullState().team1Time).toBeLessThanOrEqual(2269980);
+	expect(timer6.getFullState().team1Time).toBeGreaterThanOrEqual(2269977);
+	timer5.stopThinking();
+	timer6.stopThinking();
 });
 
 test("Getting timer instances", () => {
