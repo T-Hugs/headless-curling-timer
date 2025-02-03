@@ -962,13 +962,20 @@ export class CurlingTimer {
 
 	/**
 	 * Starts the game by setting all the clocks and other state to their initial
-	 * values.
+	 * values. This method can also be called to reset a game to the initial state.
 	 */
 	public startGame(hammerTeam?: 1 | 2) {
 		try {
 			this.beginStateChangeBatch();
 			this.setMode("game");
+			this.setGameState("idle");
 			this.pauseAllTimers();
+			this.team1Timeouts = this.settings.timeoutCount;
+			this.team2Timeouts = this.settings.timeoutCount;
+			this.teamThinking = null;
+			this.teamTimedOut = null;
+			this.lastThinkingTeam = null;
+			this.paused = false;
 			this.end = 1;
 			this.currentTeam1Stone = null;
 			this.currentTeam1Stone = null;
