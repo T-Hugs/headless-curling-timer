@@ -494,7 +494,8 @@ export function getBasicConfig(configName: BasicConfigNAme): BasicTimerSettings 
 	return JSON.parse(JSON.stringify(result));
 }
 
-const TRACK_TIME = Math.round(Number.MAX_SAFE_INTEGER / 100000000) * 1000;
+// Maximum time that can be used in a setTimeout
+const TRACK_TIME = 2 ** 31 - 1;
 
 export interface BasicTimerState {
 	/**
