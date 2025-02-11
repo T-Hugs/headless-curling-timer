@@ -730,7 +730,7 @@ export class CurlingTimer {
 	}
 
 	private fireEventListeners(eventName: string) {
-		setImmediate(() => {
+		queueMicrotask(() => {
 			const listeners = this.eventListeners.get(eventName);
 			if (listeners) {
 				for (const listener of listeners) {
